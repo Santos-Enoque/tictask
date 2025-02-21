@@ -102,23 +102,27 @@ export const Timer: React.FC<TimerProps> = ({
 
     loadConfig();
 
-    const handleConfigChange = async (changes: any) => {
-      if (changes.timerConfig) {
-        const newConfig = changes.timerConfig.newValue;
+    // Set up a message listener for config changes
+    const handleConfigChange = async (message: any) => {
+      if (message.type === "CONFIG_CHANGED") {
+        const newConfig = await storage.getTimerConfig();
         setConfig(newConfig);
 
-        await sendMessageToBackground({
-          type: "CONFIG_CHANGED",
-          config: newConfig,
-          currentStatus: timerState.status,
+        // Always update timer state when config changes
+        const response = await sendMessageToBackground({
+          type: "GET_TIMER_STATE",
         });
+
+        if (response && isTimerState(response)) {
+          setTimerState(response);
+          setProgress(calculateProgress(response));
+        }
       }
     };
 
-    chrome.storage.onChanged.addListener(handleConfigChange);
-
+    chrome.runtime.onMessage.addListener(handleConfigChange);
     return () => {
-      chrome.storage.onChanged.removeListener(handleConfigChange);
+      chrome.runtime.onMessage.removeListener(handleConfigChange);
     };
   }, [timerState.status]);
 

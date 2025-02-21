@@ -58,31 +58,25 @@ export const Settings: React.FC<SettingsProps> = ({ onSave }) => {
       // Ensure all values are valid numbers
       const validConfig = {
         id: "default",
-        pomoDuration: Math.max(1, Number(config.pomoDuration) || 25),
-        shortBreakDuration: Math.max(1, Number(config.shortBreakDuration) || 5),
-        longBreakDuration: Math.max(1, Number(config.longBreakDuration) || 15),
+        pomoDuration: Math.max(1, Number(config.pomoDuration) || 25) * 60, // Convert to seconds
+        shortBreakDuration:
+          Math.max(1, Number(config.shortBreakDuration) || 5) * 60,
+        longBreakDuration:
+          Math.max(1, Number(config.longBreakDuration) || 15) * 60,
         longBreakInterval: Math.max(1, Number(config.longBreakInterval) || 4),
       };
 
-      // Convert minutes to seconds for storage
-      const configToSave = {
-        ...validConfig,
-        pomoDuration: validConfig.pomoDuration * 60,
-        shortBreakDuration: validConfig.shortBreakDuration * 60,
-        longBreakDuration: validConfig.longBreakDuration * 60,
-      };
+      // Save timer config using our storage system
+      await storage.saveTimerConfig(validConfig);
 
-      // Save timer config to IndexedDB
-      await storage.saveTimerConfig(configToSave);
-
-      // Save notifications setting to chrome storage
-      await chrome.storage.sync.set({
-        notifications: config.notifications,
+      // Notify other components about the config change
+      await chrome.runtime.sendMessage({
+        type: "CONFIG_CHANGED",
+        config: validConfig,
       });
 
-      // Update the display with validated numbers
-      setConfig({
-        ...validConfig,
+      // Only notifications setting goes to chrome.storage.sync
+      await chrome.storage.sync.set({
         notifications: config.notifications,
       });
 

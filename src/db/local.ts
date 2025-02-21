@@ -112,6 +112,15 @@ export class LocalStorage {
   async saveTimerConfig(config: TimerConfig): Promise<void> {
     const db = await this.ensureDB();
     await db.put('timerConfig', config);
+    
+    // Add to sync queue for tracking changes
+    await this.addToSyncQueue('UPDATE', 'config', config);
+    
+    // Broadcast the change
+    chrome.runtime.sendMessage({ 
+      type: 'CONFIG_CHANGED',
+      config 
+    });
   }
 
   // Task operations

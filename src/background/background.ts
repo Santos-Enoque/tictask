@@ -88,13 +88,21 @@ class BackgroundTimer {
     }, 5000);
   }
 
-  private handleConfigChange(newConfig: TimerConfig, currentStatus: string) {
+  private async handleConfigChange(newConfig: TimerConfig, currentStatus: string) {
     const oldConfig = { ...this.config };
     this.config = newConfig;
 
+    // Always update timeRemaining in idle state
+    if (this.state.status === 'idle') {
+      this.state.timeRemaining = newConfig.pomoDuration;
+      await this.saveState(this.state);
+      this.broadcastState();
+      return;
+    }
+
+    // Handle active states
     if (this.state.status === 'break' || this.state.status === 'running' || this.state.status === 'paused') {
       if (this.state.status === 'break') {
-        // Handle break duration changes
         const isLongBreak = this.state.pomodorosCompleted % this.config.longBreakInterval === 0;
         const oldDuration = isLongBreak ? oldConfig.longBreakDuration : oldConfig.shortBreakDuration;
         const newDuration = isLongBreak ? newConfig.longBreakDuration : newConfig.shortBreakDuration;
@@ -102,13 +110,14 @@ class BackgroundTimer {
         if (oldDuration !== newDuration) {
           const remainingPercentage = this.state.timeRemaining / oldDuration;
           this.state.timeRemaining = Math.round(remainingPercentage * newDuration);
+          await this.saveState(this.state);
           this.broadcastState();
         }
       } else {
-        // Handle focus duration changes
         if (oldConfig.pomoDuration !== newConfig.pomoDuration) {
           const remainingPercentage = this.state.timeRemaining / oldConfig.pomoDuration;
           this.state.timeRemaining = Math.round(remainingPercentage * newConfig.pomoDuration);
+          await this.saveState(this.state);
           this.broadcastState();
         }
       }
