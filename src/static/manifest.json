@@ -1,6 +1,6 @@
 {
-  "name": "React Extension",
-  "description": "Chrome Extension in React!",
+  "name": "TicTask",
+  "description": "TicTask: a simple Pomodoro timer & to-do list extension designed to help you focus and finish tasks efficiently.",
   "version": "1.0.0",
   "manifest_version": 3,
   "icons": {
@@ -10,7 +10,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "React Extension",
+    "default_title": "TicTask",
     "default_icon": "icon.png"
   },
   "permissions": ["storage"],

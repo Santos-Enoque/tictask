@@ -17,7 +17,7 @@ export class TimerService extends EventEmitter {
   private pomodorosCompleted: number = 0;
 
   private config: TimerConfig = {
-    pomoDuration: 25 * 60, // 25 minutes in seconds
+    pomoDuration: 1 * 60, // 25 minutes in seconds
     shortBreakDuration: 5 * 60, // 5 minutes in seconds
     longBreakDuration: 15 * 60, // 15 minutes in seconds
     longBreakInterval: 4 // Number of pomodoros before long break

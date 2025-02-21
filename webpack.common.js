@@ -29,6 +29,9 @@ module.exports = {
   },
   resolve: {
     extensions: ['.tsx', '.ts', '.js'],
+    alias: {
+      '@': path.resolve(__dirname, 'src'),
+    }
   },
   plugins: [
     new CleanWebpackPlugin({
@@ -62,7 +65,7 @@ module.exports = {
 
 function getHtmlPlugins(chunks) {
   return chunks.map(chunk => new HtmlPlugin({
-    title: 'React Extension',
+    title: 'TicTask',
     filename: `${chunk}.html`,
     chunks: [chunk],
   }))
