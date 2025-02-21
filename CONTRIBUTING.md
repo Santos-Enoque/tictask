@@ -1,44 +1,86 @@
-
 # 🚀 Contributing to TicTask  
 
-Thank you for your interest in contributing to **TicTask**! 🎉 TicTask is an open-source Pomodoro Timer & To-Do List extension designed to help people stay productive. We welcome **bug fixes, feature additions, documentation improvements, and any contributions that make TicTask better!**  
+Thank you for your interest in contributing to **TicTask**! 🎉 TicTask is an open-source **Pomodoro Timer & To-Do List** extension designed to help people stay productive.  
+
+We welcome **bug reports, feature suggestions, code contributions, and documentation improvements**. Let's build something awesome together! 🚀  
 
 ---
 
 ## 📌 How to Contribute  
 
 ### 🛠️ 1. Setting Up the Project  
-Before making changes, you’ll need to set up TicTask on your local machine.  
 
 #### **Clone the Repository**  
 ```bash
 git clone https://github.com/yourusername/tictask.git
 cd tictask
 ```
-#### **Install Dependencies (If Applicable)**
+
+#### **Install Dependencies**  
 ```bash
 npm install  # or yarn install
 ```
+
 #### **Load the Extension in Chrome**  
 1. Open `chrome://extensions/` in your browser.  
 2. Enable **Developer Mode** (toggle in the top-right corner).  
-3. Click **"Load Unpacked"** and select the TicTask project folder.  
+3. Click **"Load Unpacked"** and select the `src/static` folder.  
 4. The extension should now be active!  
 
 ---
 
-### 🐛 2. Reporting Bugs  
+## 📂 Project Structure  
+
+```
+tictask/
+├── CONTRIBUTING.md       # Contribution guidelines
+├── README.md             # Project documentation
+├── package.json          # Dependencies
+├── postcss.config.js     # PostCSS config
+├── tailwind.config.js    # Tailwind CSS config
+├── tsconfig.json         # TypeScript config
+├── webpack.common.js     # Webpack common config
+├── webpack.dev.js        # Webpack dev config
+├── webpack.prod.js       # Webpack prod config
+├── src/
+│   ├── background/       # Background script
+│   │   └── background.ts
+│   ├── components/       # UI Components
+│   │   └── ui/
+│   │       └── button.tsx
+│   ├── contentScript/    # Content script
+│   │   └── contentScript.ts
+│   ├── lib/              # Utility functions
+│   │   └── utils.ts
+│   ├── options/          # Extension options page
+│   │   ├── options.css
+│   │   └── options.tsx
+│   ├── popup/            # Popup UI
+│   │   ├── popup.css
+│   │   └── popup.tsx
+│   ├── static/           # Static files (icons, manifest)
+│   │   ├── icon.png
+│   │   └── manifest.json
+│   ├── styles/           # Global styles
+│   │   └── global.css
+```
+
+---
+
+## 🐛 2. Reporting Bugs  
+
 If you find a bug, please **open an issue** and include:  
-- **A clear description** of the issue.  
+- A **clear description** of the issue.  
 - **Steps to reproduce** the bug.  
-- **Expected behavior** vs. what actually happens.  
+- **Expected behavior** vs. actual behavior.  
 - **Screenshots** (if applicable).  
 
 🔗 **[Open an Issue](https://github.com/yourusername/tictask/issues/new)**  
 
 ---
 
-### 🌟 3. Requesting a Feature  
+## 🌟 3. Requesting a Feature  
+
 Have an idea to improve TicTask? Before submitting a feature request:  
 - **Check existing issues** to see if it’s already suggested.  
 - If not, **open a new issue** and describe:  
@@ -50,30 +92,32 @@ Have an idea to improve TicTask? Before submitting a feature request:
 
 ---
 
-### 📥 4. Submitting a Pull Request (PR)  
-Ready to contribute code? Follow these steps:  
+## 📥 4. Submitting a Pull Request (PR)  
 
-#### **1. Fork the Repository**
+#### **1. Fork the Repository**  
 Click the **"Fork"** button on GitHub and clone your fork:  
 ```bash
 git clone https://github.com/yourusername/tictask.git
 cd tictask
 ```
+
 #### **2. Create a New Branch**  
 Use a meaningful branch name:  
 ```bash
 git checkout -b feature-name
 ```
-#### **3. Make Your Changes & Test**  
-- Keep your code **clean and well-documented**.  
-- Test your changes locally before submitting.  
 
-#### **4. Commit & Push**  
+#### **3. Make Your Changes & Test Locally**  
+- Keep your code **clean and well-documented**.  
+- Test your changes **before submitting**.  
+
+#### **4. Commit & Push Your Changes**  
 ```bash
 git add .
 git commit -m "✨ Added feature XYZ"
 git push origin feature-name
 ```
+
 #### **5. Open a Pull Request**  
 1. Go to **your forked repository** on GitHub.  
 2. Click **"New Pull Request"**.  
@@ -86,29 +130,14 @@ git push origin feature-name
 ---
 
 ## 🔥 Code Guidelines  
-To maintain a clean and scalable codebase, follow these best practices:  
 
 ### ✅ **Code Style**  
 - Use **camelCase** for variables and functions.  
 - Use **PascalCase** for components and classes.  
 - Keep functions **short and modular**.  
 
-### 📂 **Project Structure**  
-```
-tictask/
-│── src/                # Main source code
-│   ├── components/     # UI Components
-│   ├── utils/          # Helper functions
-│   ├── styles/         # CSS or Tailwind styles
-│── public/             # Static assets
-│── manifest.json       # Chrome extension manifest
-│── README.md           # Project documentation
-│── CONTRIBUTING.md     # Contribution guidelines
-│── package.json        # Dependencies
-```
-
 ### 📝 **Commit Message Format**  
-Use **conventional commit messages**:  
+Follow **conventional commit messages**:  
 ```
 ✨ feat: Added GitHub-style focus analytics  
 🐛 fix: Resolved issue with timer reset  
@@ -118,17 +147,35 @@ Use **conventional commit messages**:
 
 ---
 
+## 🎯 Future Improvements  
+
+We are actively working on new features! Check the [Issues](https://github.com/yourusername/tictask/issues) tab to see what's planned next.  
+
+Some upcoming features:  
+- 🌙 **Dark Mode & Custom Themes**  
+- 📊 **Advanced Productivity Reports**  
+- 📅 **Google Calendar & Notion Sync**  
+- 🌍 **Multi-Language Support**  
+
+---
+
 ## 🙌 Join the Community!  
+
 💬 **Have questions? Need help?** Join our discussions:  
 🔗 **[GitHub Discussions](https://github.com/yourusername/tictask/discussions)**  
 🐦 **Follow us on Twitter** [@TicTaskApp](https://twitter.com/TicTaskApp)  
 
 ---
 
+## 📄 License  
+
+TicTask is open-source and released under the **MIT License**. See [LICENSE](LICENSE) for details.  
+
+---
+
 ## 🎯 Our Vision  
+
 We believe **productivity should be simple, effective, and fun**. TicTask is **built by the community, for the community**—and **your contributions make a difference**! 🚀  
 
 👨‍💻 **Contribute Today & Help Build the Future of Focused Work!**  
-
-```
 
