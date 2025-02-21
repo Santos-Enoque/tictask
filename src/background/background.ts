@@ -59,6 +59,14 @@ class BackgroundTimer {
           this.handleConfigChange(message.config, message.currentStatus);
           sendResponse(this.getState());
           break;
+        case 'START_BREAK':
+          this.startBreak();
+          sendResponse(this.getState());
+          break;
+        case 'SKIP_BREAK':
+          this.skipBreak();
+          sendResponse(this.getState());
+          break;
       }
       return true; // Required for async response
     });
@@ -300,6 +308,28 @@ class BackgroundTimer {
     // Get notifications setting (TODO: move to storage)
     const result = await chrome.storage.sync.get('notifications');
     return result.notifications !== false;
+  }
+
+  private async startBreak() {
+    if (this.state.status !== 'break') return;
+    
+    const isLongBreak = this.state.pomodorosCompleted % this.config.longBreakInterval === 0;
+    this.state.timeRemaining = isLongBreak 
+      ? this.config.longBreakDuration 
+      : this.config.shortBreakDuration;
+    
+    await this.start();
+  }
+
+  private async skipBreak() {
+    if (this.state.status !== 'break') return;
+    
+    // Reset for next focus session
+    this.state.status = 'idle';
+    this.state.timeRemaining = this.config.pomoDuration;
+    this.state.currentTaskId = null;
+    await this.saveState(this.state);
+    this.broadcastState();
   }
 }
 

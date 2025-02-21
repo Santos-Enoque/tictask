@@ -193,6 +193,11 @@ export const Timer: React.FC<TimerProps> = ({
   }, []);
 
   const calculateProgress = (state: TimerState) => {
+    // If timer hasn't started (idle state), progress should be 0
+    if (state.status === "idle") {
+      return 0;
+    }
+
     let total;
     if (state.status === "break") {
       const isLongBreak =
@@ -203,7 +208,9 @@ export const Timer: React.FC<TimerProps> = ({
     } else {
       total = config.pomoDuration;
     }
-    return ((total - state.timeRemaining) / total) * 100;
+
+    // Calculate how much time has elapsed instead of how much remains
+    return (state.timeRemaining / total) * 100;
   };
 
   const formatTime = (seconds: number): string => {
@@ -253,6 +260,19 @@ export const Timer: React.FC<TimerProps> = ({
   const isTimerActive =
     timerState.status === "running" || timerState.status === "paused";
 
+  // Add new handlers for break
+  const handleStartBreak = async () => {
+    await sendMessageToBackground({
+      type: "START_BREAK",
+    });
+  };
+
+  const handleSkipBreak = async () => {
+    await sendMessageToBackground({
+      type: "SKIP_BREAK",
+    });
+  };
+
   return (
     <Card className="w-full">
       <CardHeader className="space-y-1">
@@ -268,24 +288,26 @@ export const Timer: React.FC<TimerProps> = ({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-col items-center space-y-4">
-          <Select
-            disabled={isTimerActive}
-            value={selectedTask?.id || ""}
-            onValueChange={handleTaskSelect}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a task...">
-                {selectedTask?.title || "Select a task..."}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              {tasks.map((task) => (
-                <SelectItem key={task.id} value={task.id}>
-                  {task.title}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          {timerState.status !== "break" && (
+            <Select
+              disabled={isTimerActive}
+              value={selectedTask?.id || ""}
+              onValueChange={handleTaskSelect}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Select a task...">
+                  {selectedTask?.title || "Select a task..."}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                {tasks.map((task) => (
+                  <SelectItem key={task.id} value={task.id}>
+                    {task.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
           <div className="text-6xl font-bold tabular-nums">
             {formatTime(timerState.timeRemaining)}
@@ -315,7 +337,51 @@ export const Timer: React.FC<TimerProps> = ({
               </Button>
             )}
 
-            {timerState.status !== "idle" && (
+            {/* Break controls */}
+            {timerState.status === "break" && (
+              <div className="flex space-x-2">
+                {timerState.timeRemaining === config.shortBreakDuration ||
+                timerState.timeRemaining === config.longBreakDuration ? (
+                  // Break not started yet
+                  <>
+                    <Button
+                      variant="default"
+                      size="lg"
+                      onClick={handleStartBreak}
+                    >
+                      <Coffee className="mr-2 h-4 w-4" />
+                      Start Break
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      size="lg"
+                      onClick={handleSkipBreak}
+                    >
+                      <Play className="mr-2 h-4 w-4" />
+                      Skip Break
+                    </Button>
+                  </>
+                ) : (
+                  // Break in progress
+                  <>
+                    <Button variant="secondary" size="lg" onClick={handlePause}>
+                      <Pause className="mr-2 h-4 w-4" />
+                      Pause Break
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      onClick={handleSkipBreak}
+                    >
+                      <Play className="mr-2 h-4 w-4" />
+                      Skip Break
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+
+            {timerState.status !== "idle" && timerState.status !== "break" && (
               <Button variant="outline" size="lg" onClick={handleReset}>
                 <RotateCcw className="mr-2 h-4 w-4" />
                 Reset
@@ -323,7 +389,7 @@ export const Timer: React.FC<TimerProps> = ({
             )}
           </div>
 
-          {timerState.status === "break" && (
+          {timerState.status === "break" && timerState.timeRemaining > 0 && (
             <div className="flex items-center text-sm text-muted-foreground">
               <Coffee className="mr-2 h-4 w-4" />
               Take a well-deserved break!
