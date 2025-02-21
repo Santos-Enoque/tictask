@@ -7,7 +7,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Timer, Check, Trash2, Calendar } from "lucide-react";
+import {
+  Plus,
+  Timer,
+  Check,
+  Trash2,
+  Calendar,
+  MoreVertical,
+  Play,
+  Pause,
+  Pencil,
+} from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -27,13 +37,15 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { CalendarIcon } from "@radix-ui/react-icons";
-import { Task } from "@/types";
+import { Task, TaskStatus } from "@/types";
+import { Checkbox } from "@/components/ui/checkbox";
 
 interface TaskItemProps {
   task: Task;
   onDelete: (taskId: string) => void;
   onComplete: (taskId: string) => void;
   onSelect?: (taskId: string) => void;
+  onEdit?: (task: Task) => void;
   isSelected?: boolean;
 }
 
@@ -42,8 +54,16 @@ const TaskItem: React.FC<TaskItemProps> = ({
   onDelete,
   onComplete,
   onSelect,
+  onEdit,
   isSelected,
 }) => {
+  const [isEditing, setIsEditing] = useState(false);
+
+  const handleStatusChange = (checked: boolean) => {
+    const newStatus: TaskStatus = checked ? "completed" : "to_do";
+    onComplete(task.id);
+  };
+
   return (
     <div
       className={`
@@ -55,65 +75,103 @@ const TaskItem: React.FC<TaskItemProps> = ({
       `}
     >
       <div className="flex items-center justify-between gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className="font-medium truncate">{task.title}</h3>
-            <Badge variant="secondary" className="text-xs capitalize shrink-0">
-              {task.status}
-            </Badge>
-          </div>
-          {task.description && (
-            <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
-              {task.description}
-            </p>
-          )}
-          <div className="flex items-center gap-2 mt-2">
-            <Badge variant="outline" className="text-xs">
-              <span className="mr-1">{task.pomodorosCompleted}</span>
-              🍅
-              {task.estimatedPomodoros && (
-                <span className="ml-1">/ {task.estimatedPomodoros}</span>
+        <div className="flex items-start gap-3 flex-1 min-w-0">
+          <Checkbox
+            checked={task.status === "completed"}
+            onCheckedChange={handleStatusChange}
+            className="mt-1"
+          />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-start justify-between gap-2">
+              <h3
+                className={`font-medium truncate ${
+                  task.status === "completed"
+                    ? "line-through text-muted-foreground"
+                    : ""
+                }`}
+              >
+                {task.title}
+              </h3>
+              {task.status === "in_progress" && (
+                <Badge
+                  variant="secondary"
+                  className="text-xs capitalize shrink-0"
+                >
+                  In Progress
+                </Badge>
               )}
-            </Badge>
-            {task.dueDate && (
-              <Badge variant="outline" className="text-xs">
-                <CalendarIcon className="mr-1 h-3 w-3" />
-                {format(new Date(task.dueDate), "MMM d, yyyy")}
-              </Badge>
+            </div>
+            {task.description && (
+              <p className="text-sm text-muted-foreground mt-1 line-clamp-2">
+                {task.description}
+              </p>
             )}
+            <div className="flex items-center gap-2 mt-2">
+              <Badge variant="outline" className="text-xs">
+                <span className="mr-1">{task.pomodorosCompleted}</span>
+                🍅
+                {task.estimatedPomodoros && (
+                  <span className="ml-1">/ {task.estimatedPomodoros}</span>
+                )}
+              </Badge>
+              {task.dueDate && (
+                <Badge variant="outline" className="text-xs">
+                  <CalendarIcon className="mr-1 h-3 w-3" />
+                  {format(new Date(task.dueDate), "MMM d, yyyy")}
+                </Badge>
+              )}
+            </div>
           </div>
         </div>
         <div className="flex items-center gap-1 shrink-0">
-          {onSelect && task.status !== "completed" && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onSelect(task.id)}
-              className={`${
-                isSelected ? "text-primary bg-primary/10" : ""
-              } hover:bg-primary/5`}
-            >
-              <Timer className="h-4 w-4" />
-            </Button>
-          )}
-          {task.status !== "completed" && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => onComplete(task.id)}
-              className="hover:bg-green-500/5 hover:text-green-500"
-            >
-              <Check className="h-4 w-4" />
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => onDelete(task.id)}
-            className="hover:bg-destructive/5 hover:text-destructive"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="hover:bg-accent">
+                <MoreVertical className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-40 p-0">
+              <div className="flex flex-col">
+                {task.status !== "completed" && onSelect && (
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start rounded-none"
+                    onClick={() => onSelect(task.id)}
+                  >
+                    {isSelected ? (
+                      <>
+                        <Pause className="mr-2 h-4 w-4" />
+                        Stop Timer
+                      </>
+                    ) : (
+                      <>
+                        <Play className="mr-2 h-4 w-4" />
+                        Start Timer
+                      </>
+                    )}
+                  </Button>
+                )}
+                {onEdit && task.status !== "completed" && (
+                  <Button
+                    variant="ghost"
+                    className="w-full justify-start rounded-none"
+                    onClick={() => onEdit(task)}
+                  >
+                    <Pencil className="mr-2 h-4 w-4" />
+                    Edit
+                  </Button>
+                )}
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start rounded-none text-destructive hover:text-destructive"
+                  onClick={() => onDelete(task.id)}
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete
+                </Button>
+              </div>
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
     </div>
@@ -133,6 +191,8 @@ export const TaskList: React.FC<TaskListProps> = ({
 }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isAddingTask, setIsAddingTask] = useState(false);
+  const [isEditingTask, setIsEditingTask] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [dateRange, setDateRange] = useState<[Date | null, Date | null]>([
     new Date(),
     new Date(),
@@ -181,7 +241,7 @@ export const TaskList: React.FC<TaskListProps> = ({
       estimatedPomodoros: newTask.estimatedPomodoros
         ? parseInt(newTask.estimatedPomodoros)
         : undefined,
-      status: "pending",
+      status: "to_do",
       dueDate: newTask.dueDate.getTime(),
     });
 
@@ -204,11 +264,22 @@ export const TaskList: React.FC<TaskListProps> = ({
   };
 
   const handleCompleteTask = async (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    const newStatus: TaskStatus =
+      task.status === "completed" ? "to_do" : "completed";
+
     await taskService.updateTask(taskId, {
-      status: "completed",
-      completedAt: Date.now(),
+      status: newStatus,
+      completedAt: newStatus === "completed" ? Date.now() : undefined,
     });
-    if (selectedTaskId === taskId && onTaskSelect) {
+
+    if (
+      selectedTaskId === taskId &&
+      onTaskSelect &&
+      newStatus === "completed"
+    ) {
       onTaskSelect(null);
     }
     loadTasks();
@@ -221,6 +292,29 @@ export const TaskList: React.FC<TaskListProps> = ({
         onTaskSelected();
       }
     }
+  };
+
+  const handleEditTask = async () => {
+    if (!editingTask || !editingTask.title.trim()) return;
+
+    await taskService.updateTask(editingTask.id, {
+      title: editingTask.title,
+      description: editingTask.description,
+      estimatedPomodoros: editingTask.estimatedPomodoros,
+      dueDate: editingTask.dueDate,
+    });
+
+    setEditingTask(null);
+    setIsEditingTask(false);
+    loadTasks();
+  };
+
+  const startEditing = (task: Task) => {
+    setEditingTask({
+      ...task,
+      dueDate: task.dueDate,
+    });
+    setIsEditingTask(true);
   };
 
   return (
@@ -341,11 +435,96 @@ export const TaskList: React.FC<TaskListProps> = ({
                 onDelete={handleDeleteTask}
                 onComplete={handleCompleteTask}
                 onSelect={handleTaskSelect}
+                onEdit={startEditing}
                 isSelected={task.id === selectedTaskId}
               />
             ))
           )}
         </ScrollArea>
+
+        {/* Edit Task Dialog */}
+        <Dialog open={isEditingTask} onOpenChange={setIsEditingTask}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle>Edit Task</DialogTitle>
+              <DialogDescription>
+                Update the details of your task.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <div className="space-y-2">
+                <Label htmlFor="edit-title">Title</Label>
+                <Input
+                  id="edit-title"
+                  value={editingTask?.title || ""}
+                  onChange={(e) =>
+                    setEditingTask((prev) =>
+                      prev ? { ...prev, title: e.target.value } : null
+                    )
+                  }
+                  placeholder="Task title"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-description">Description</Label>
+                <Textarea
+                  id="edit-description"
+                  value={editingTask?.description || ""}
+                  onChange={(e) =>
+                    setEditingTask((prev) =>
+                      prev ? { ...prev, description: e.target.value } : null
+                    )
+                  }
+                  placeholder="Task description (optional)"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="edit-pomodoros">Estimated Pomodoros</Label>
+                <Input
+                  id="edit-pomodoros"
+                  type="number"
+                  min="1"
+                  value={editingTask?.estimatedPomodoros || ""}
+                  onChange={(e) =>
+                    setEditingTask((prev) =>
+                      prev
+                        ? {
+                            ...prev,
+                            estimatedPomodoros:
+                              parseInt(e.target.value) || undefined,
+                          }
+                        : null
+                    )
+                  }
+                  placeholder="Number of pomodoros (optional)"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Due Date</Label>
+                <div className="relative">
+                  <DatePicker
+                    selected={
+                      editingTask?.dueDate
+                        ? new Date(editingTask.dueDate)
+                        : null
+                    }
+                    onChange={(date: Date) =>
+                      setEditingTask((prev) =>
+                        prev ? { ...prev, dueDate: date.getTime() } : null
+                      )
+                    }
+                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                    dateFormat="MMM d, yyyy"
+                    placeholderText="Select a due date"
+                  />
+                </div>
+              </div>
+              <Button onClick={handleEditTask} className="w-full">
+                Update Task
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );

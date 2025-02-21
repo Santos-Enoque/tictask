@@ -13,7 +13,7 @@ export interface Task {
     dueDate: number; // timestamp
   }
   
-  export type TaskStatus = 'pending' | 'in_progress' | 'completed';
+  export type TaskStatus = 'to_do' | 'in_progress' | 'completed';
 export interface TimerState {
   timeRemaining: number;
   status: "idle" | "running" | "paused" | "break";
