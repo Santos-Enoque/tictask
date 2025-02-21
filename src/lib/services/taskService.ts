@@ -1,16 +1,5 @@
 // src/lib/services/taskService.ts
-export interface Task {
-    id: string;
-    title: string;
-    description?: string;
-    status: 'pending' | 'in_progress' | 'completed';
-    createdAt: number;
-    updatedAt: number;
-    completedAt?: number;
-    pomodorosCompleted: number;
-    estimatedPomodoros?: number;
-  }
-  
+import { Task } from '@/types';
   export class TaskService {
     private static instance: TaskService;
   

@@ -24,15 +24,23 @@ class BackgroundTimer {
     longBreakInterval: 4
   };
 
+  private lastUpdateTime: number = Date.now();
+
   constructor() {
     this.setupMessageListeners();
-    this.loadConfig(); // Load initial config
+    this.loadConfig();
+    this.setupKeepAlive();
   }
 
   private async loadConfig() {
     const result = await chrome.storage.sync.get(['timerConfig', 'notifications']);
     if (result.timerConfig) {
       this.config = result.timerConfig;
+      
+      // Only update timeRemaining if in idle state
+      if (this.state.status === 'idle') {
+        this.state.timeRemaining = this.config.pomoDuration;
+      }
     }
     return result.notifications !== false;
   }
@@ -55,8 +63,58 @@ class BackgroundTimer {
         case 'GET_TIMER_STATE':
           sendResponse(this.getState());
           break;
+        case 'CONFIG_CHANGED':
+          this.handleConfigChange(message.config, message.currentStatus);
+          sendResponse(this.getState());
+          break;
       }
+      return true; // Required for async response
     });
+  }
+
+  private setupKeepAlive() {
+    chrome.runtime.onConnect.addListener((port) => {
+      port.onDisconnect.addListener(() => {
+        // Check timer state and restart if needed
+        if (this.state.status === 'running' && !this.interval) {
+          this.start();
+        }
+      });
+    });
+
+    // Check timer state periodically
+    setInterval(() => {
+      if (this.state.status === 'running' && !this.interval) {
+        this.start();
+      }
+    }, 5000);
+  }
+
+  private handleConfigChange(newConfig: TimerConfig, currentStatus: string) {
+    const oldConfig = { ...this.config };
+    this.config = newConfig;
+
+    if (this.state.status === 'break' || this.state.status === 'running' || this.state.status === 'paused') {
+      if (this.state.status === 'break') {
+        // Handle break duration changes
+        const isLongBreak = this.state.pomodorosCompleted % this.config.longBreakInterval === 0;
+        const oldDuration = isLongBreak ? oldConfig.longBreakDuration : oldConfig.shortBreakDuration;
+        const newDuration = isLongBreak ? newConfig.longBreakDuration : newConfig.shortBreakDuration;
+
+        if (oldDuration !== newDuration) {
+          const remainingPercentage = this.state.timeRemaining / oldDuration;
+          this.state.timeRemaining = Math.round(remainingPercentage * newDuration);
+          this.broadcastState();
+        }
+      } else {
+        // Handle focus duration changes
+        if (oldConfig.pomoDuration !== newConfig.pomoDuration) {
+          const remainingPercentage = this.state.timeRemaining / oldConfig.pomoDuration;
+          this.state.timeRemaining = Math.round(remainingPercentage * newConfig.pomoDuration);
+          this.broadcastState();
+        }
+      }
+    }
   }
 
   private async broadcastState() {
@@ -67,8 +125,10 @@ class BackgroundTimer {
   private async saveSession(type: 'pomodoro' | 'short_break' | 'long_break') {
     const session: TimerSession = {
       id: Date.now().toString(),
+      date: new Date().toISOString(),
       startTime: Date.now() - (this.config.pomoDuration - this.state.timeRemaining) * 1000,
       endTime: Date.now(),
+      duration: this.config.pomoDuration - this.state.timeRemaining,
       type,
       completed: true,
       taskId: this.state.currentTaskId
@@ -95,24 +155,38 @@ class BackgroundTimer {
     }
 
     this.state.status = 'running';
-    this.interval = setInterval(() => {
-      this.state.timeRemaining--;
-      this.broadcastState();
+    this.lastUpdateTime = Date.now();
 
-      if (this.state.timeRemaining <= 0) {
-        this.complete();
+    this.interval = setInterval(async () => {
+      const currentTime = Date.now();
+      const deltaSeconds = Math.floor((currentTime - this.lastUpdateTime) / 1000);
+      this.lastUpdateTime = currentTime;
+
+      if (deltaSeconds > 0) {
+        this.state.timeRemaining = Math.max(0, this.state.timeRemaining - deltaSeconds);
+        this.broadcastState();
+
+        if (this.state.timeRemaining <= 0) {
+          await this.complete();
+        }
       }
     }, 1000);
 
     this.broadcastState();
     
     const notifications = await this.loadConfig();
+    const isBreakStarting = this.state.status === 'running' && this.state.timeRemaining === (
+      this.state.pomodorosCompleted % this.config.longBreakInterval === 0 
+        ? this.config.longBreakDuration 
+        : this.config.shortBreakDuration
+    );
+
     if (notifications) {
       chrome.notifications.create({
         type: 'basic',
         iconUrl: '/icon.png',
-        title: 'Pomodoro Timer Started',
-        message: 'Focus time has begun!',
+        title: isBreakStarting ? 'Break Started' : 'Focus Time Started',
+        message: isBreakStarting ? 'Time to recharge!' : 'Stay focused and productive!',
       });
     }
   }
@@ -131,8 +205,13 @@ class BackgroundTimer {
       clearInterval(this.interval);
       this.interval = null;
     }
-    await this.loadConfig(); // Reload config in case it changed
-    this.state.timeRemaining = this.config.pomoDuration;
+
+    await this.loadConfig();
+    this.state.timeRemaining = this.state.status === 'break' 
+      ? (this.state.pomodorosCompleted % this.config.longBreakInterval === 0 
+        ? this.config.longBreakDuration 
+        : this.config.shortBreakDuration)
+      : this.config.pomoDuration;
     this.state.status = 'idle';
     this.broadcastState();
   }
@@ -146,6 +225,7 @@ class BackgroundTimer {
     const notifications = await this.loadConfig();
 
     if (this.state.status !== 'break') {
+      // Completing a focus session
       this.state.pomodorosCompleted++;
       await this.saveSession('pomodoro');
       
@@ -158,12 +238,15 @@ class BackgroundTimer {
         chrome.notifications.create({
           type: 'basic',
           iconUrl: '/icon.png',
-          title: isLongBreak ? 'Long Break Time!' : 'Break Time!',
+          title: isLongBreak ? 'Long Break Time!' : 'Short Break Time!',
           message: `Great work! Take a ${isLongBreak ? 'long' : 'short'} break.`,
         });
       }
     } else {
-      await this.saveSession(this.state.timeRemaining === this.config.longBreakDuration ? 'long_break' : 'short_break');
+      // Completing a break
+      await this.saveSession(
+        this.state.timeRemaining === this.config.longBreakDuration ? 'long_break' : 'short_break'
+      );
       this.state.timeRemaining = this.config.pomoDuration;
       
       if (notifications) {
@@ -187,10 +270,3 @@ class BackgroundTimer {
 
 // Initialize the background timer
 const backgroundTimer = new BackgroundTimer();
-
-// Keep service worker alive
-chrome.runtime.onConnect.addListener(function(port) {
-  port.onDisconnect.addListener(function() {
-    // Reconnect logic if needed
-  });
-});

@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Timer } from '@/components/Timer';
-import { TaskList } from '@/components/TaskList';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Clock, ListTodo, BarChart3, SettingsIcon } from 'lucide-react';
-import { Settings } from '@/components/Settings';
+import { Timer } from "@/components/Timer";
+import { TaskList } from "@/components/TaskList";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Clock, ListTodo, BarChart3, SettingsIcon } from "lucide-react";
+import { Settings } from "@/components/Settings";
 import "../styles/global.css";
+import "../styles/datepicker.css";
 import "./popup.css";
+import { Stats } from "@/components/Stats";
 
 const App = () => {
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -22,7 +24,7 @@ const App = () => {
 
   const handleSettingsSave = () => {
     // Reload timer state after settings change
-    chrome.runtime.sendMessage({ type: 'GET_TIMER_STATE' });
+    chrome.runtime.sendMessage({ type: "GET_TIMER_STATE" });
   };
 
   return (
@@ -46,27 +48,24 @@ const App = () => {
             Settings
           </TabsTrigger>
         </TabsList>
-        
+
         <TabsContent value="timer" className="mt-4 h-full">
-          <Timer 
+          <Timer
             selectedTaskId={selectedTaskId}
             onTaskComplete={handleTaskComplete}
           />
         </TabsContent>
-        
+
         <TabsContent value="tasks" className="mt-4">
-          <TaskList 
+          <TaskList
             selectedTaskId={selectedTaskId}
             onTaskSelect={setSelectedTaskId}
             onTaskSelected={handleSwitchToTimer}
           />
         </TabsContent>
-        
+
         <TabsContent value="stats" className="mt-4">
-          {/* Stats component will go here */}
-          <div className="text-center text-muted-foreground">
-            Statistics coming soon...
-          </div>
+          <Stats />
         </TabsContent>
 
         <TabsContent value="settings" className="mt-4">
