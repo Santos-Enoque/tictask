@@ -45,9 +45,13 @@ export const Stats: React.FC = () => {
         ).getDate();
         break;
       case "year":
-        // Start from one year ago
-        startDate.setFullYear(today.getFullYear() - 1);
-        gridSize = 365;
+        // Start from first day of current year
+        startDate = new Date(
+          today.getFullYear() - 1,
+          today.getMonth(),
+          today.getDate() + 1
+        );
+        gridSize = 371; // 53 weeks × 7 days to ensure we have complete weeks
         break;
     }
 
