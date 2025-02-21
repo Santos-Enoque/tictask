@@ -1,49 +1,81 @@
 // src/components/Timer/Timer.tsx
 import React, { useEffect, useState } from 'react';
-import { TimerService, TimerState } from '@/lib/services/timerService';
-import { StorageService } from '@/lib/services/storageService';
+import { Task } from '@/types';
+import { TaskService } from '@/lib/services/taskService';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Play, Pause, RotateCcw, Coffee } from 'lucide-react';
 
-export const Timer: React.FC = () => {
-  const [timeRemaining, setTimeRemaining] = useState<number>(0);
-  const [timerState, setTimerState] = useState<TimerState>('idle');
+interface TimerProps {
+  selectedTaskId?: string | null;
+  onTaskComplete?: () => void;
+}
+
+interface TimerState {
+  timeRemaining: number;
+  status: 'idle' | 'running' | 'paused' | 'break';
+  pomodorosCompleted: number;
+  currentTaskId: string | null;
+}
+
+export const Timer: React.FC<TimerProps> = ({ selectedTaskId, onTaskComplete }) => {
+  const [timerState, setTimerState] = useState<TimerState>({
+    timeRemaining: 25 * 60,
+    status: 'idle',
+    pomodorosCompleted: 0,
+    currentTaskId: null
+  });
   const [progress, setProgress] = useState<number>(0);
-  const [timerService] = useState(() => new TimerService());
-  const [storageService] = useState(() => StorageService.getInstance());
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  const calculateProgress = (state: TimerState) => {
+    const total = state.status === 'break' ? 
+      (state.timeRemaining >= 15 * 60 ? 15 * 60 : 5 * 60) : // 15 min for long break, 5 for short
+      25 * 60; // 25 minutes for focus
+    return ((total - state.timeRemaining) / total) * 100;
+  };
 
   useEffect(() => {
-    const loadConfig = async () => {
-      const config = await storageService.getTimerConfig();
-      timerService.reset();
+    // Load initial timer state and set progress
+    chrome.runtime.sendMessage({ type: 'GET_TIMER_STATE' }, (response: TimerState) => {
+      setTimerState(response);
+      setProgress(calculateProgress(response));
+    });
+
+    // Set up listener for timer updates
+    const handleTimerUpdate = (message: any) => {
+      if (message.type === 'TIMER_UPDATE') {
+        setTimerState(message.state);
+        setProgress(calculateProgress(message.state));
+      }
     };
-    loadConfig();
 
-    timerService.on('tick', (time: number) => {
-      setTimeRemaining(time);
-      // Calculate progress percentage
-      const total = timerState === 'break' ? 5 * 60 : 25 * 60; // 5 or 25 minutes in seconds
-      setProgress(((total - time) / total) * 100);
-    });
+    chrome.runtime.onMessage.addListener(handleTimerUpdate);
+
+    // Keep connection alive
+    const port = chrome.runtime.connect({ name: 'timer-port' });
     
-    timerService.on('stateChange', (state: TimerState) => setTimerState(state));
-    timerService.on('pomodoroComplete', async (count: number) => {
-      await storageService.saveSession({
-        id: Date.now().toString(),
-        startTime: Date.now() - 25 * 60 * 1000,
-        endTime: Date.now(),
-        type: 'pomodoro',
-        completed: true
-      });
-    });
-
     return () => {
-      timerService.removeAllListeners();
+      chrome.runtime.onMessage.removeListener(handleTimerUpdate);
+      port.disconnect();
     };
   }, []);
+
+  useEffect(() => {
+    const loadTask = async () => {
+      if (selectedTaskId) {
+        const taskService = TaskService.getInstance();
+        const tasks = await taskService.getAllTasks();
+        const task = tasks.find(t => t.id === selectedTaskId);
+        setSelectedTask(task || null);
+      } else {
+        setSelectedTask(null);
+      }
+    };
+    loadTask();
+  }, [selectedTaskId]);
 
   const formatTime = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
@@ -51,9 +83,20 @@ export const Timer: React.FC = () => {
     return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
   };
 
-  const handleStart = () => timerService.start();
-  const handlePause = () => timerService.pause();
-  const handleReset = () => timerService.reset();
+  const handleStart = () => {
+    chrome.runtime.sendMessage({ 
+      type: 'START_TIMER',
+      taskId: selectedTaskId
+    });
+  };
+
+  const handlePause = () => {
+    chrome.runtime.sendMessage({ type: 'PAUSE_TIMER' });
+  };
+
+  const handleReset = () => {
+    chrome.runtime.sendMessage({ type: 'RESET_TIMER' });
+  };
 
   return (
     <Card className="w-full">
@@ -61,23 +104,23 @@ export const Timer: React.FC = () => {
         <div className="flex justify-between items-center">
           <CardTitle className="text-2xl">Focus Timer</CardTitle>
           <Badge 
-            variant={timerState === 'break' ? 'secondary' : 'default'}
+            variant={timerState.status === 'break' ? 'secondary' : 'default'}
             className="capitalize"
           >
-            {timerState === 'break' ? 'Break Time' : 'Focus Time'}
+            {timerState.status === 'break' ? 'Break Time' : 'Focus Time'}
           </Badge>
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-col items-center space-y-4">
           <div className="text-6xl font-bold tabular-nums">
-            {formatTime(timeRemaining)}
+            {formatTime(timerState.timeRemaining)}
           </div>
           
           <Progress value={progress} className="w-full" />
 
           <div className="flex justify-center space-x-2">
-            {timerState === 'idle' && (
+            {timerState.status === 'idle' && (
               <Button 
                 variant="default" 
                 size="lg"
@@ -88,7 +131,7 @@ export const Timer: React.FC = () => {
               </Button>
             )}
             
-            {timerState === 'running' && (
+            {timerState.status === 'running' && (
               <Button 
                 variant="secondary" 
                 size="lg"
@@ -99,7 +142,7 @@ export const Timer: React.FC = () => {
               </Button>
             )}
             
-            {timerState === 'paused' && (
+            {timerState.status === 'paused' && (
               <Button 
                 variant="default" 
                 size="lg"
@@ -110,7 +153,7 @@ export const Timer: React.FC = () => {
               </Button>
             )}
             
-            {timerState !== 'idle' && (
+            {timerState.status !== 'idle' && (
               <Button 
                 variant="outline" 
                 size="lg"
@@ -122,10 +165,18 @@ export const Timer: React.FC = () => {
             )}
           </div>
 
-          {timerState === 'break' && (
+          {timerState.status === 'break' && (
             <div className="flex items-center text-sm text-muted-foreground">
               <Coffee className="mr-2 h-4 w-4" />
               Take a well-deserved break!
+            </div>
+          )}
+
+          {selectedTask && (
+            <div className="flex items-center gap-2 text-sm">
+              <Badge variant="secondary">
+                Current Task: {selectedTask.title}
+              </Badge>
             </div>
           )}
         </div>

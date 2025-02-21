@@ -1,16 +1,34 @@
-import React from "react";
+import React, { useState } from "react";
 import { createRoot } from "react-dom/client";
 import { Timer } from '@/components/Timer';
+import { TaskList } from '@/components/TaskList';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Clock, ListTodo, BarChart3 } from 'lucide-react';
+import { Clock, ListTodo, BarChart3, SettingsIcon } from 'lucide-react';
+import { Settings } from '@/components/Settings';
 import "../styles/global.css";
 import "./popup.css";
 
 const App = () => {
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState("timer");
+
+  const handleTaskComplete = () => {
+    setSelectedTaskId(null);
+  };
+
+  const handleSwitchToTimer = () => {
+    setActiveTab("timer");
+  };
+
+  const handleSettingsSave = () => {
+    // Reload timer state after settings change
+    chrome.runtime.sendMessage({ type: 'GET_TIMER_STATE' });
+  };
+
   return (
-    <div className="w-80 min-h-[400px] bg-background p-2">
-      <Tabs defaultValue="timer" className="h-full">
-        <TabsList className="grid w-full grid-cols-3">
+    <div className="w-[400px] min-h-[500px] bg-background p-4">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
+        <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="timer" className="flex items-center">
             <Clock className="mr-2 h-4 w-4" />
             Timer
@@ -23,17 +41,25 @@ const App = () => {
             <BarChart3 className="mr-2 h-4 w-4" />
             Stats
           </TabsTrigger>
+          <TabsTrigger value="settings" className="flex items-center">
+            <SettingsIcon className="mr-2 h-4 w-4" />
+            Settings
+          </TabsTrigger>
         </TabsList>
         
         <TabsContent value="timer" className="mt-4 h-full">
-          <Timer />
+          <Timer 
+            selectedTaskId={selectedTaskId}
+            onTaskComplete={handleTaskComplete}
+          />
         </TabsContent>
         
         <TabsContent value="tasks" className="mt-4">
-          {/* Task list component will go here */}
-          <div className="text-center text-muted-foreground">
-            Tasks coming soon...
-          </div>
+          <TaskList 
+            selectedTaskId={selectedTaskId}
+            onTaskSelect={setSelectedTaskId}
+            onTaskSelected={handleSwitchToTimer}
+          />
         </TabsContent>
         
         <TabsContent value="stats" className="mt-4">
@@ -41,6 +67,10 @@ const App = () => {
           <div className="text-center text-muted-foreground">
             Statistics coming soon...
           </div>
+        </TabsContent>
+
+        <TabsContent value="settings" className="mt-4">
+          <Settings onSave={handleSettingsSave} />
         </TabsContent>
       </Tabs>
     </div>

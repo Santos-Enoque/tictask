@@ -1,7 +1,7 @@
 {
   "name": "TicTask",
   "description": "TicTask: a simple Pomodoro timer & to-do list extension designed to help you focus and finish tasks efficiently.",
-  "version": "1.0.0",
+  "version": "1.0",
   "manifest_version": 3,
   "icons": {
     "16": "icon.png",
@@ -13,7 +13,7 @@
     "default_title": "TicTask",
     "default_icon": "icon.png"
   },
-  "permissions": ["storage"],
+  "permissions": ["storage", "notifications", "background"],
   "options_page": "options.html",
   "background": {
     "service_worker": "background.js"
