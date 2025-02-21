@@ -66,15 +66,17 @@ class BackgroundTimer {
 
   private setupKeepAlive() {
     chrome.runtime.onConnect.addListener((port) => {
-      try {
-        port.onDisconnect.addListener(() => {
-          // Check timer state and restart if needed, but don't throw if port is closed
-          if (this.state.status === 'running' && !this.interval) {
-            this.start(this.state.currentTaskId);
-          }
-        });
-      } catch (error) {
-        console.warn("Port disconnection error:", error);
+      if (port.name === "timer-port") {
+        try {
+          port.onDisconnect.addListener(() => {
+            // Silently handle disconnection
+            if (chrome.runtime.lastError) {
+              console.debug("Port disconnected:", chrome.runtime.lastError.message);
+            }
+          });
+        } catch (error) {
+          console.debug("Port error:", error);
+        }
       }
     });
 

@@ -130,7 +130,9 @@ export class LocalStorage {
   }
 
   async getAllTasks(): Promise<Task[]> {
-    return await this.db.getAll('tasks');
+    const db = await this.ensureDB();
+    const tasks = await db.getAll('tasks');
+    return tasks.filter(task => task.status === 'to_do' || task.status === 'in_progress');
   }
 
   async updateTask(taskId: string, updates: Partial<Task>): Promise<Task | null> {

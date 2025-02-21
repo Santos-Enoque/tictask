@@ -8,6 +8,13 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Play, Pause, RotateCcw, Coffee } from "lucide-react";
 import { storage } from "@/db/local";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface TimerProps {
   selectedTaskId?: string | null;
@@ -32,6 +39,7 @@ export const Timer: React.FC<TimerProps> = ({
     longBreakDuration: 15 * 60,
     longBreakInterval: 4,
   });
+  const [tasks, setTasks] = useState<Task[]>([]);
 
   // Add this type guard function at the top level of your component
   const isTimerState = (value: unknown): value is TimerState => {
@@ -114,6 +122,72 @@ export const Timer: React.FC<TimerProps> = ({
     };
   }, [timerState.status]);
 
+  useEffect(() => {
+    const initializeTimer = async () => {
+      try {
+        // Load initial timer state
+        const response = await sendMessageToBackground({
+          type: "GET_TIMER_STATE",
+        });
+        if (response && isTimerState(response)) {
+          setTimerState(response);
+          setProgress(calculateProgress(response));
+
+          // Load the task if there's a currentTaskId in the timer state
+          if (response.currentTaskId) {
+            const task = await storage.getTask(response.currentTaskId);
+            setSelectedTask(task || null);
+          }
+        }
+
+        // Set up listener for timer updates
+        const handleTimerUpdate = async (message: any) => {
+          if (message.type === "TIMER_UPDATE") {
+            setTimerState(message.state);
+            setProgress(calculateProgress(message.state));
+
+            // Update selected task when timer state changes
+            if (message.state.currentTaskId) {
+              const task = await storage.getTask(message.state.currentTaskId);
+              setSelectedTask(task || null);
+            } else {
+              setSelectedTask(null);
+            }
+          }
+        };
+
+        chrome.runtime.onMessage.addListener(handleTimerUpdate);
+
+        return () => {
+          chrome.runtime.onMessage.removeListener(handleTimerUpdate);
+        };
+      } catch (error) {
+        console.error("Failed to initialize timer:", error);
+      }
+    };
+
+    initializeTimer();
+  }, []);
+
+  // Add this effect to load tasks
+  useEffect(() => {
+    const loadTasks = async () => {
+      const taskService = TaskService.getInstance();
+      const allTasks = await taskService.getAllTasks();
+      setTasks(allTasks.filter((task) => task.status !== "completed"));
+
+      // Load current task from timer state
+      const timerState = await storage.getTimerState();
+      if (timerState.currentTaskId) {
+        const currentTask = await storage.getTask(timerState.currentTaskId);
+        if (currentTask) {
+          setSelectedTask(currentTask);
+        }
+      }
+    };
+    loadTasks();
+  }, []);
+
   const calculateProgress = (state: TimerState) => {
     let total;
     if (state.status === "break") {
@@ -127,54 +201,6 @@ export const Timer: React.FC<TimerProps> = ({
     }
     return ((total - state.timeRemaining) / total) * 100;
   };
-
-  useEffect(() => {
-    const initializeTimer = async () => {
-      try {
-        // Load initial timer state
-        const response = await sendMessageToBackground({
-          type: "GET_TIMER_STATE",
-        });
-        if (response && isTimerState(response)) {
-          setTimerState(response);
-          setProgress(calculateProgress(response));
-        }
-
-        // Set up listener for timer updates
-        const handleTimerUpdate = (message: any) => {
-          if (message.type === "TIMER_UPDATE") {
-            setTimerState(message.state);
-            setProgress(calculateProgress(message.state));
-          }
-        };
-
-        chrome.runtime.onMessage.addListener(handleTimerUpdate);
-
-        // Keep connection alive only while popup is open
-        let port: chrome.runtime.Port | null = null;
-        try {
-          port = chrome.runtime.connect({ name: "timer-port" });
-        } catch (error) {
-          console.warn("Failed to establish connection:", error);
-        }
-
-        return () => {
-          chrome.runtime.onMessage.removeListener(handleTimerUpdate);
-          if (port) {
-            try {
-              port.disconnect();
-            } catch (error) {
-              console.warn("Error disconnecting port:", error);
-            }
-          }
-        };
-      } catch (error) {
-        console.error("Failed to initialize timer:", error);
-      }
-    };
-
-    initializeTimer();
-  }, []);
 
   const formatTime = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
@@ -208,6 +234,21 @@ export const Timer: React.FC<TimerProps> = ({
     return "Focus Time";
   };
 
+  // Add task selection handler
+  const handleTaskSelect = async (taskId: string) => {
+    const task = tasks.find((t) => t.id === taskId);
+    if (task) {
+      setSelectedTask(task);
+      await sendMessageToBackground({
+        type: "START_TIMER",
+        taskId: task.id,
+      });
+    }
+  };
+
+  const isTimerActive =
+    timerState.status === "running" || timerState.status === "paused";
+
   return (
     <Card className="w-full">
       <CardHeader className="space-y-1">
@@ -223,6 +264,25 @@ export const Timer: React.FC<TimerProps> = ({
       </CardHeader>
       <CardContent className="space-y-4">
         <div className="flex flex-col items-center space-y-4">
+          <Select
+            disabled={isTimerActive}
+            value={selectedTask?.id || ""}
+            onValueChange={handleTaskSelect}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select a task...">
+                {selectedTask?.title || "Select a task..."}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              {tasks.map((task) => (
+                <SelectItem key={task.id} value={task.id}>
+                  {task.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <div className="text-6xl font-bold tabular-nums">
             {formatTime(timerState.timeRemaining)}
           </div>
@@ -263,14 +323,6 @@ export const Timer: React.FC<TimerProps> = ({
             <div className="flex items-center text-sm text-muted-foreground">
               <Coffee className="mr-2 h-4 w-4" />
               Take a well-deserved break!
-            </div>
-          )}
-
-          {selectedTask && (
-            <div className="flex items-center gap-2 text-sm">
-              <Badge variant="secondary">
-                Current Task: {selectedTask.title}
-              </Badge>
             </div>
           )}
 
