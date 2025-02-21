@@ -58,6 +58,58 @@ const TaskItem: React.FC<TaskItemProps> = ({
   isSelected,
 }) => {
   const [isEditing, setIsEditing] = useState(false);
+  const [timerState, setTimerState] = useState<string>("idle");
+  const [anyTimerRunning, setAnyTimerRunning] = useState(false);
+
+  useEffect(() => {
+    const getInitialState = async () => {
+      const response = await chrome.runtime.sendMessage({
+        type: "GET_TIMER_STATE",
+      });
+      if (response) {
+        if (task.id === response.currentTaskId) {
+          setTimerState(response.status);
+        }
+        setAnyTimerRunning(
+          response.status === "running" ||
+            response.status === "break" ||
+            response.status === "paused"
+        );
+      }
+    };
+
+    getInitialState();
+
+    const handleTimerUpdate = (message: any) => {
+      if (message.type === "TIMER_UPDATE") {
+        if (task.id === message.state.currentTaskId) {
+          setTimerState(message.state.status);
+        }
+        setAnyTimerRunning(
+          message.state.status === "running" ||
+            message.state.status === "break" ||
+            message.state.status === "paused"
+        );
+      }
+    };
+
+    chrome.runtime.onMessage.addListener(handleTimerUpdate);
+    return () => chrome.runtime.onMessage.removeListener(handleTimerUpdate);
+  }, [task.id]);
+
+  const getBorderColor = () => {
+    if (isSelected) {
+      switch (timerState) {
+        case "running":
+          return "border-green-500";
+        case "paused":
+          return "border-yellow-500";
+        default:
+          return "border-accent";
+      }
+    }
+    return "border-border";
+  };
 
   const handleStatusChange = (checked: boolean) => {
     const newStatus: TaskStatus = checked ? "completed" : "to_do";
@@ -67,8 +119,9 @@ const TaskItem: React.FC<TaskItemProps> = ({
   return (
     <div
       className={`
-        p-4 border rounded-lg mb-2 
+        p-4 border-2 rounded-lg mb-2 
         ${isSelected ? "bg-accent" : "bg-card"} 
+        ${getBorderColor()}
         ${task.status === "completed" ? "opacity-60" : ""}
         transition-all
         hover:shadow-sm
@@ -137,6 +190,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
                     variant="ghost"
                     className="w-full justify-start rounded-none"
                     onClick={() => onSelect(task.id)}
+                    disabled={anyTimerRunning && !isSelected}
                   >
                     {isSelected ? (
                       <>
@@ -209,6 +263,23 @@ export const TaskList: React.FC<TaskListProps> = ({
   useEffect(() => {
     loadTasks();
   }, [dateRange]);
+
+  useEffect(() => {
+    const initializeSelectedTask = async () => {
+      try {
+        const response = await chrome.runtime.sendMessage({
+          type: "GET_TIMER_STATE",
+        });
+        if (response?.currentTaskId && onTaskSelect) {
+          onTaskSelect(response.currentTaskId);
+        }
+      } catch (error) {
+        console.error("Failed to initialize selected task:", error);
+      }
+    };
+
+    initializeSelectedTask();
+  }, [onTaskSelect]);
 
   const loadTasks = async () => {
     const loadedTasks = await taskService.getAllTasks();
@@ -285,9 +356,23 @@ export const TaskList: React.FC<TaskListProps> = ({
     loadTasks();
   };
 
-  const handleTaskSelect = (taskId: string) => {
+  const handleTaskSelect = async (taskId: string) => {
     if (onTaskSelect) {
-      onTaskSelect(selectedTaskId === taskId ? null : taskId);
+      const newTaskId = selectedTaskId === taskId ? null : taskId;
+      onTaskSelect(newTaskId);
+
+      // If we're deselecting the task (stopping the timer)
+      if (newTaskId === null) {
+        await chrome.runtime.sendMessage({ type: "PAUSE_TIMER" });
+        await chrome.runtime.sendMessage({ type: "RESET_TIMER" });
+      } else {
+        // Starting the timer with the new task
+        await chrome.runtime.sendMessage({
+          type: "START_TIMER",
+          taskId: newTaskId,
+        });
+      }
+
       if (onTaskSelected) {
         onTaskSelected();
       }

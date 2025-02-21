@@ -150,12 +150,23 @@ export const Timer: React.FC<TimerProps> = ({
 
         chrome.runtime.onMessage.addListener(handleTimerUpdate);
 
-        // Keep connection alive
-        const port = connectToBackground();
+        // Keep connection alive only while popup is open
+        let port: chrome.runtime.Port | null = null;
+        try {
+          port = chrome.runtime.connect({ name: "timer-port" });
+        } catch (error) {
+          console.warn("Failed to establish connection:", error);
+        }
 
         return () => {
           chrome.runtime.onMessage.removeListener(handleTimerUpdate);
-          if (port) port.disconnect();
+          if (port) {
+            try {
+              port.disconnect();
+            } catch (error) {
+              console.warn("Error disconnecting port:", error);
+            }
+          }
         };
       } catch (error) {
         console.error("Failed to initialize timer:", error);
@@ -164,18 +175,6 @@ export const Timer: React.FC<TimerProps> = ({
 
     initializeTimer();
   }, []);
-
-  useEffect(() => {
-    const loadTask = async () => {
-      if (selectedTaskId) {
-        const task = await storage.getTask(selectedTaskId);
-        setSelectedTask(task || null);
-      } else {
-        setSelectedTask(null);
-      }
-    };
-    loadTask();
-  }, [selectedTaskId]);
 
   const formatTime = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);

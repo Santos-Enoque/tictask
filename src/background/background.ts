@@ -66,18 +66,22 @@ class BackgroundTimer {
 
   private setupKeepAlive() {
     chrome.runtime.onConnect.addListener((port) => {
-      port.onDisconnect.addListener(() => {
-        // Check timer state and restart if needed
-        if (this.state.status === 'running' && !this.interval) {
-          this.start();
-        }
-      });
+      try {
+        port.onDisconnect.addListener(() => {
+          // Check timer state and restart if needed, but don't throw if port is closed
+          if (this.state.status === 'running' && !this.interval) {
+            this.start(this.state.currentTaskId);
+          }
+        });
+      } catch (error) {
+        console.warn("Port disconnection error:", error);
+      }
     });
 
     // Check timer state periodically
     setInterval(() => {
       if (this.state.status === 'running' && !this.interval) {
-        this.start();
+        this.start(this.state.currentTaskId);
       }
     }, 5000);
   }
@@ -140,10 +144,15 @@ class BackgroundTimer {
 
     if (taskId !== undefined) {
       this.state.currentTaskId = taskId;
+      // Update task status to in_progress when timer starts
+      if (taskId) {
+        await storage.updateTask(taskId, { status: 'in_progress' });
+      }
     }
 
     this.state.status = 'running';
     this.state.lastUpdateTime = Date.now();
+    await this.saveState(this.state);
 
     this.interval = setInterval(async () => {
       const currentTime = Date.now();
@@ -152,6 +161,7 @@ class BackgroundTimer {
 
       if (deltaSeconds > 0) {
         this.state.timeRemaining = Math.max(0, this.state.timeRemaining - deltaSeconds);
+        await this.saveState(this.state);
         this.broadcastState();
 
         if (this.state.timeRemaining <= 0) {
@@ -179,12 +189,13 @@ class BackgroundTimer {
     }
   }
 
-  private pause() {
+  private async pause() {
     if (this.interval) {
       clearInterval(this.interval);
       this.interval = null;
     }
     this.state.status = 'paused';
+    await this.saveState(this.state);
     this.broadcastState();
   }
 
@@ -194,6 +205,14 @@ class BackgroundTimer {
       this.interval = null;
     }
 
+    // Update task status back to to_do when timer is reset
+    if (this.state.currentTaskId) {
+      const task = await storage.getTask(this.state.currentTaskId);
+      if (task && task.status === 'in_progress') {
+        await storage.updateTask(this.state.currentTaskId, { status: 'to_do' });
+      }
+    }
+
     await this.loadConfig();
     this.state.timeRemaining = this.state.status === 'break' 
       ? (this.state.pomodorosCompleted % this.config.longBreakInterval === 0 
@@ -201,6 +220,8 @@ class BackgroundTimer {
         : this.config.shortBreakDuration)
       : this.config.pomoDuration;
     this.state.status = 'idle';
+    this.state.currentTaskId = null;
+    await this.saveState(this.state);
     this.broadcastState();
   }
 
@@ -248,6 +269,7 @@ class BackgroundTimer {
     }
 
     this.state.status = this.state.status === 'break' ? 'idle' : 'break';
+    await this.saveState(this.state);
     this.broadcastState();
   }
 
