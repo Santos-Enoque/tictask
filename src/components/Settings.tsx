@@ -5,8 +5,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { TimerConfig } from "@/types";
+import { TimerConfig } from "@/db/schema";
 import { Bell } from "lucide-react";
+import { storage } from "@/db/local";
 
 interface SettingsProps {
   onSave?: () => void;
@@ -16,6 +17,7 @@ export const Settings: React.FC<SettingsProps> = ({ onSave }) => {
   const [config, setConfig] = useState<
     TimerConfig & { notifications: boolean }
   >({
+    id: "default",
     pomoDuration: 25,
     shortBreakDuration: 5,
     longBreakDuration: 15,
@@ -25,60 +27,71 @@ export const Settings: React.FC<SettingsProps> = ({ onSave }) => {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    // Load current settings
-    chrome.storage.sync.get(["timerConfig", "notifications"], (result) => {
-      if (result.timerConfig) {
+    const loadSettings = async () => {
+      try {
+        const timerConfig = await storage.getTimerConfig();
+        // Get notifications setting from chrome storage since it's a browser-level setting
+        const { notifications } = await chrome.storage.sync.get(
+          "notifications"
+        );
+
         setConfig({
+          ...timerConfig,
           // Convert seconds to minutes for display
-          pomoDuration: Math.floor(result.timerConfig.pomoDuration / 60),
-          shortBreakDuration: Math.floor(
-            result.timerConfig.shortBreakDuration / 60
-          ),
-          longBreakDuration: Math.floor(
-            result.timerConfig.longBreakDuration / 60
-          ),
-          longBreakInterval: result.timerConfig.longBreakInterval,
-          notifications: result.notifications !== false,
+          pomoDuration: Math.floor(timerConfig.pomoDuration / 60),
+          shortBreakDuration: Math.floor(timerConfig.shortBreakDuration / 60),
+          longBreakDuration: Math.floor(timerConfig.longBreakDuration / 60),
+          notifications: notifications !== false,
         });
+      } catch (error) {
+        console.error("Failed to load settings:", error);
       }
-    });
+    };
+
+    loadSettings();
   }, []);
 
   const handleSave = async () => {
     setIsSaving(true);
 
-    // Ensure all values are valid numbers before saving
-    const validConfig = {
-      pomoDuration: Math.max(1, Number(config.pomoDuration) || 25),
-      shortBreakDuration: Math.max(1, Number(config.shortBreakDuration) || 5),
-      longBreakDuration: Math.max(1, Number(config.longBreakDuration) || 15),
-      longBreakInterval: Math.max(1, Number(config.longBreakInterval) || 4),
-    };
+    try {
+      // Ensure all values are valid numbers
+      const validConfig = {
+        id: "default",
+        pomoDuration: Math.max(1, Number(config.pomoDuration) || 25),
+        shortBreakDuration: Math.max(1, Number(config.shortBreakDuration) || 5),
+        longBreakDuration: Math.max(1, Number(config.longBreakDuration) || 15),
+        longBreakInterval: Math.max(1, Number(config.longBreakInterval) || 4),
+      };
 
-    // Convert minutes to seconds for storage
-    const configToSave = {
-      pomoDuration: validConfig.pomoDuration * 60,
-      shortBreakDuration: validConfig.shortBreakDuration * 60,
-      longBreakDuration: validConfig.longBreakDuration * 60,
-      longBreakInterval: validConfig.longBreakInterval,
-    };
+      // Convert minutes to seconds for storage
+      const configToSave = {
+        ...validConfig,
+        pomoDuration: validConfig.pomoDuration * 60,
+        shortBreakDuration: validConfig.shortBreakDuration * 60,
+        longBreakDuration: validConfig.longBreakDuration * 60,
+      };
 
-    await chrome.storage.sync.set({
-      timerConfig: configToSave,
-      notifications: config.notifications,
-    });
+      // Save timer config to IndexedDB
+      await storage.saveTimerConfig(configToSave);
 
-    // Update the display with validated numbers
-    setConfig({
-      ...validConfig,
-      notifications: config.notifications,
-    });
+      // Save notifications setting to chrome storage
+      await chrome.storage.sync.set({
+        notifications: config.notifications,
+      });
 
-    // Artificial delay for better UX
-    await new Promise((resolve) => setTimeout(resolve, 500));
+      // Update the display with validated numbers
+      setConfig({
+        ...validConfig,
+        notifications: config.notifications,
+      });
 
-    if (onSave) onSave();
-    setIsSaving(false);
+      if (onSave) onSave();
+    } catch (error) {
+      console.error("Failed to save settings:", error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleInputChange = (

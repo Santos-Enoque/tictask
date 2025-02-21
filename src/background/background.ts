@@ -1,48 +1,40 @@
 // src/background/background.ts
-import { TimerConfig, TimerSession } from '@/types';
+import { storage } from '@/db/local';
+import { TimerConfig, TimerSession, TimerStateDB, DEFAULT_VALUES } from '@/db/schema';
 
-interface TimerState {
-  timeRemaining: number;
-  status: 'idle' | 'running' | 'paused' | 'break';
-  pomodorosCompleted: number;
-  currentTaskId: string | null;
-}
 
 class BackgroundTimer {
   private interval: NodeJS.Timeout | null = null;
-  private state: TimerState = {
-    timeRemaining: 25 * 60,
-    status: 'idle',
-    pomodorosCompleted: 0,
-    currentTaskId: null
-  };
-
-  private config: TimerConfig = {
-    pomoDuration: 25 * 60,
-    shortBreakDuration: 5 * 60,
-    longBreakDuration: 15 * 60,
-    longBreakInterval: 4
-  };
-
-  private lastUpdateTime: number = Date.now();
+  private state: TimerStateDB;
+  private config: TimerConfig;
 
   constructor() {
+    this.setupInstallListener();
     this.setupMessageListeners();
-    this.loadConfig();
+    this.loadState();
     this.setupKeepAlive();
   }
 
-  private async loadConfig() {
-    const result = await chrome.storage.sync.get(['timerConfig', 'notifications']);
-    if (result.timerConfig) {
-      this.config = result.timerConfig;
-      
-      // Only update timeRemaining if in idle state
-      if (this.state.status === 'idle') {
-        this.state.timeRemaining = this.config.pomoDuration;
+  private async setupInstallListener() {
+    chrome.runtime.onInstalled.addListener(async (details) => {
+      if (details.reason === 'install') {
+        // Set default values
+        await storage.saveTimerConfig(DEFAULT_VALUES.timerConfig);
+        await storage.updateTimerState(DEFAULT_VALUES.timerState);
+        
+        // Set default notification preference
+        await chrome.storage.sync.set({ notifications: true });
       }
-    }
-    return result.notifications !== false;
+    });
+  }
+
+  private async loadState() {
+    this.state = await storage.getTimerState();
+    this.config = await storage.getTimerConfig();
+  }
+
+  private async saveState(updates: Partial<TimerStateDB>) {
+    this.state = await storage.updateTimerState(updates);
   }
 
   private setupMessageListeners() {
@@ -134,16 +126,12 @@ class BackgroundTimer {
       taskId: this.state.currentTaskId
     };
 
-    const { sessions = [] } = await chrome.storage.local.get('sessions');
-    await chrome.storage.local.set({ sessions: [...sessions, session] });
+    await storage.saveSession(session);
 
     if (type === 'pomodoro' && this.state.currentTaskId) {
-      const { tasks = [] } = await chrome.storage.local.get('tasks');
-      const taskIndex = tasks.findIndex(t => t.id === this.state.currentTaskId);
-      if (taskIndex !== -1) {
-        tasks[taskIndex].pomodorosCompleted++;
-        await chrome.storage.local.set({ tasks });
-      }
+      await storage.updateTask(this.state.currentTaskId, {
+        pomodorosCompleted: (await storage.getTask(this.state.currentTaskId))?.pomodorosCompleted + 1 || 1
+      });
     }
   }
 
@@ -155,12 +143,12 @@ class BackgroundTimer {
     }
 
     this.state.status = 'running';
-    this.lastUpdateTime = Date.now();
+    this.state.lastUpdateTime = Date.now();
 
     this.interval = setInterval(async () => {
       const currentTime = Date.now();
-      const deltaSeconds = Math.floor((currentTime - this.lastUpdateTime) / 1000);
-      this.lastUpdateTime = currentTime;
+      const deltaSeconds = Math.floor((currentTime - this.state.lastUpdateTime) / 1000);
+      this.state.lastUpdateTime = currentTime;
 
       if (deltaSeconds > 0) {
         this.state.timeRemaining = Math.max(0, this.state.timeRemaining - deltaSeconds);
@@ -263,8 +251,22 @@ class BackgroundTimer {
     this.broadcastState();
   }
 
-  private getState(): TimerState {
+  private getState(): TimerStateDB {
     return { ...this.state };
+  }
+
+  private async loadConfig() {
+    const config = await storage.getTimerConfig();
+    this.config = config;
+    
+    // Only update timeRemaining if in idle state
+    if (this.state.status === 'idle') {
+      this.state.timeRemaining = this.config.pomoDuration;
+    }
+    
+    // Get notifications setting (TODO: move to storage)
+    const result = await chrome.storage.sync.get('notifications');
+    return result.notifications !== false;
   }
 }
 

@@ -55,6 +55,13 @@ export interface TimerState {
     };
   }
   
+export interface SyncQueue {
+  id: string;
+  operation: 'CREATE' | 'UPDATE' | 'DELETE';
+  type: 'task' | 'session' | 'config';
+  data: any;
+  timestamp: string;
+} 
   export interface WeeklyStats {
     weekStart: string; // YYYY-MM-DD of week start
     weekEnd: string; // YYYY-MM-DD of week end

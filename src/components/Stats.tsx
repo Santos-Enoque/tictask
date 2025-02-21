@@ -12,6 +12,7 @@ import { TimerSession } from "@/types";
 import html2canvas from "html2canvas";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { storage } from "@/db/local";
 
 type TimePeriod = "week" | "month" | "year";
 
@@ -67,22 +68,18 @@ export const Stats: React.FC = () => {
   }, [period]);
 
   const loadStats = async () => {
-    const { sessions = [] } = await chrome.storage.local.get("sessions");
-    const { startDate, endDate } = getDateRange(period);
+    const sessions = await storage.getSessionsByDateRange(
+      getDateRange(period).startDate.toISOString(),
+      getDateRange(period).endDate.toISOString()
+    );
 
-    const pomodoroSessions = sessions.filter((s: TimerSession) => {
-      const sessionDate = new Date(s.startTime);
-      return (
-        s.type === "pomodoro" &&
-        s.completed &&
-        sessionDate >= startDate &&
-        sessionDate <= endDate
-      );
-    });
+    const pomodoroSessions = sessions.filter(
+      (s) => s.type === "pomodoro" && s.completed
+    );
 
     // Group sessions by date
     const daily: DailyPomodoros = {};
-    pomodoroSessions.forEach((session: TimerSession) => {
+    pomodoroSessions.forEach((session) => {
       const date = new Date(session.startTime).toISOString().split("T")[0];
       daily[date] = (daily[date] || 0) + 1;
     });
@@ -90,9 +87,9 @@ export const Stats: React.FC = () => {
     // Calculate streak within the period
     let currentStreak = 0;
     let maxStreak = 0;
-    let lastDate = new Date(endDate);
+    let lastDate = new Date(getDateRange(period).endDate);
 
-    while (lastDate >= startDate) {
+    while (lastDate >= getDateRange(period).startDate) {
       const dateStr = lastDate.toISOString().split("T")[0];
       if (daily[dateStr]) {
         currentStreak++;

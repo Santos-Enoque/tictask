@@ -1,34 +1,39 @@
 // src/lib/services/timerService.ts
 import { EventEmitter } from 'events';
+import { TimerConfig } from '@/db/schema';
+import { storage } from '@/db/local';
 
 export type TimerState = 'idle' | 'running' | 'paused' | 'break';
-
-export interface TimerConfig {
-  pomoDuration: number;
-  shortBreakDuration: number;
-  longBreakDuration: number;
-  longBreakInterval: number;
-}
 
 export class TimerService extends EventEmitter {
   private timeRemaining: number = 0;
   private interval: NodeJS.Timeout | null = null;
   private state: TimerState = 'idle';
   private pomodorosCompleted: number = 0;
+  private config: TimerConfig;
 
-  private config: TimerConfig = {
-    pomoDuration: 1 * 60, // 25 minutes in seconds
-    shortBreakDuration: 5 * 60, // 5 minutes in seconds
-    longBreakDuration: 15 * 60, // 15 minutes in seconds
-    longBreakInterval: 4 // Number of pomodoros before long break
-  };
-
-  constructor(config?: Partial<TimerConfig>) {
+  constructor() {
     super();
-    if (config) {
-      this.config = { ...this.config, ...config };
-    }
+    this.config = {
+      id: 'default',
+      pomoDuration: 25 * 60,
+      shortBreakDuration: 5 * 60,
+      longBreakDuration: 15 * 60,
+      longBreakInterval: 4
+    };
     this.timeRemaining = this.config.pomoDuration;
+    this.loadConfig();
+  }
+
+  private async loadConfig() {
+    this.config = await storage.getTimerConfig();
+    this.timeRemaining = this.config.pomoDuration;
+    this.emit('tick', this.timeRemaining);
+  }
+
+  async updateConfig(config: Partial<TimerConfig>): Promise<void> {
+    await storage.saveTimerConfig({ ...this.config, ...config });
+    await this.loadConfig();
   }
 
   start(): void {

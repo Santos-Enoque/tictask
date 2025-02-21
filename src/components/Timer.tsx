@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Play, Pause, RotateCcw, Coffee } from "lucide-react";
+import { storage } from "@/db/local";
 
 interface TimerProps {
   selectedTaskId?: string | null;
@@ -77,18 +78,15 @@ export const Timer: React.FC<TimerProps> = ({
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const result = await chrome.storage.sync.get("timerConfig");
-        if (result.timerConfig) {
-          const newConfig = result.timerConfig;
-          setConfig(newConfig);
+        const timerConfig = await storage.getTimerConfig();
+        setConfig(timerConfig);
 
-          // Safely send config change message
-          await sendMessageToBackground({
-            type: "CONFIG_CHANGED",
-            config: newConfig,
-            currentStatus: timerState.status,
-          });
-        }
+        // Safely send config change message
+        await sendMessageToBackground({
+          type: "CONFIG_CHANGED",
+          config: timerConfig,
+          currentStatus: timerState.status,
+        });
       } catch (error) {
         console.error("Failed to load config:", error);
       }
@@ -170,9 +168,7 @@ export const Timer: React.FC<TimerProps> = ({
   useEffect(() => {
     const loadTask = async () => {
       if (selectedTaskId) {
-        const taskService = TaskService.getInstance();
-        const tasks = await taskService.getAllTasks();
-        const task = tasks.find((t) => t.id === selectedTaskId);
+        const task = await storage.getTask(selectedTaskId);
         setSelectedTask(task || null);
       } else {
         setSelectedTask(null);
