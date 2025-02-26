@@ -1,3 +1,4 @@
+// src/db/local.ts
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
 import { DB_SCHEMA, Task, TimerSession, TimerConfig, SyncQueue, TimerStateDB, DEFAULT_VALUES } from './schema';
 
@@ -49,7 +50,7 @@ export class LocalStorage {
   }
 
   private async initDB() {
-    this.db = await openDB<TicTaskDB>('tictask-db', 1, {
+    this.db = await openDB<TicTaskDB>('tictask-db-1', 1, {
       upgrade(db) {
         // Create object stores if they don't exist
         if (!db.objectStoreNames.contains('tasks')) {
@@ -100,6 +101,7 @@ export class LocalStorage {
     const currentState = await this.getTimerState();
     const newState = { ...currentState, ...updates };
     await db.put('timerState', newState);
+    console.log("newState", newState);
     return newState;
   }
 
@@ -113,14 +115,15 @@ export class LocalStorage {
     const db = await this.ensureDB();
     await db.put('timerConfig', config);
     
-    // Add to sync queue for tracking changes
-    await this.addToSyncQueue('UPDATE', 'config', config);
+    // // Verify the config was saved by loading it back
+    // // Add to sync queue for tracking changes
+    // await this.addToSyncQueue('UPDATE', 'config', config);
     
-    // Broadcast the change
-    chrome.runtime.sendMessage({ 
-      type: 'CONFIG_CHANGED',
-      config 
-    });
+    // // Broadcast the change
+    // chrome.runtime.sendMessage({ 
+    //   type: 'CONFIG_CHANGED',
+    //   config 
+    // });
   }
 
   // Task operations

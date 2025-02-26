@@ -1,4 +1,4 @@
-// src/components/Tasks/TaskList.tsx
+// src/components/TaskList.tsx
 import DatePicker from "react-datepicker";
 import "react-datepicker/dist/react-datepicker.css";
 import React, { useEffect, useState } from "react";

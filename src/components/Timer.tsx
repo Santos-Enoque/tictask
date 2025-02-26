@@ -1,6 +1,7 @@
-// src/components/Timer/Timer.tsx
+// src/components/Timer.tsx
 import React, { useEffect, useState } from "react";
-import { Task, TimerConfig, TimerState } from "@/types";
+// import { Task, TimerConfig, TimerState } from "@/types";
+import { Task, TimerConfig, TimerStateDB } from "@/db/schema";
 import { TaskService } from "@/lib/services/taskService";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,15 +26,19 @@ export const Timer: React.FC<TimerProps> = ({
   selectedTaskId,
   onTaskComplete,
 }) => {
-  const [timerState, setTimerState] = useState<TimerState>({
+  const [timerState, setTimerState] = useState<TimerStateDB>({
+    id: "default",
     timeRemaining: 25 * 60,
     status: "idle",
     pomodorosCompleted: 0,
     currentTaskId: null,
+    lastUpdateTime: Date.now(),
+    timerMode: "focus",
   });
   const [progress, setProgress] = useState<number>(0);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [config, setConfig] = useState<TimerConfig>({
+  const [config, setConfig] = useState<TimerConfig >({
+    id: "default",
     pomoDuration: 25 * 60,
     shortBreakDuration: 5 * 60,
     longBreakDuration: 15 * 60,
@@ -42,43 +47,36 @@ export const Timer: React.FC<TimerProps> = ({
   const [tasks, setTasks] = useState<Task[]>([]);
 
   // Add this type guard function at the top level of your component
-  const isTimerState = (value: unknown): value is TimerState => {
+  const isTimerState = (value: unknown): value is TimerStateDB => {
     return (
       typeof value === "object" &&
       value !== null &&
       "timeRemaining" in value &&
       "status" in value &&
       "pomodorosCompleted" in value &&
-      "currentTaskId" in value
+      "currentTaskId" in value &&
+      "timerMode" in value
     );
   };
 
   // Helper function to safely send messages to background
   const sendMessageToBackground = async (message: any) => {
     try {
-      return await new Promise((resolve, reject) => {
+      return await new Promise((resolve) => {
         chrome.runtime.sendMessage(message, (response) => {
           if (chrome.runtime.lastError) {
-            console.warn("Chrome runtime error:", chrome.runtime.lastError);
-            reject(chrome.runtime.lastError);
+            console.debug(
+              "Chrome runtime message not delivered:",
+              chrome.runtime.lastError.message
+            );
+            resolve(null);
           } else {
             resolve(response);
           }
         });
       });
     } catch (error) {
-      console.error("Failed to send message to background:", error);
-      return null;
-    }
-  };
-
-  // Helper function to safely connect to background
-  const connectToBackground = () => {
-    try {
-      const port = chrome.runtime.connect({ name: "timer-port" });
-      return port;
-    } catch (error) {
-      console.error("Failed to connect to background:", error);
+      console.debug("Failed to send message to background:", error);
       return null;
     }
   };
@@ -87,13 +85,30 @@ export const Timer: React.FC<TimerProps> = ({
     const loadConfig = async () => {
       try {
         const timerConfig = await storage.getTimerConfig();
+        console.log("timerConfig", timerConfig);
         setConfig(timerConfig);
+
+        // Get current timer state
+        const currentState = await storage.getTimerState();
+
+        // Only reset timer if idle
+        if (currentState.status === "idle") {
+          const newState = {
+            ...currentState,
+            timeRemaining: timerConfig.pomoDuration,
+          };
+          setTimerState(newState);
+          setProgress(0);
+        } else {
+          // Recalculate progress with new config
+          setProgress(await calculateProgress(currentState));
+        }
 
         // Safely send config change message
         await sendMessageToBackground({
           type: "CONFIG_CHANGED",
           config: timerConfig,
-          currentStatus: timerState.status,
+          currentStatus: currentState.status,
         });
       } catch (error) {
         console.error("Failed to load config:", error);
@@ -105,18 +120,14 @@ export const Timer: React.FC<TimerProps> = ({
     // Set up a message listener for config changes
     const handleConfigChange = async (message: any) => {
       if (message.type === "CONFIG_CHANGED") {
-        const newConfig = await storage.getTimerConfig();
+        const [newConfig, newState] = await Promise.all([
+          storage.getTimerConfig(),
+          storage.getTimerState(),
+        ]);
+
         setConfig(newConfig);
-
-        // Always update timer state when config changes
-        const response = await sendMessageToBackground({
-          type: "GET_TIMER_STATE",
-        });
-
-        if (response && isTimerState(response)) {
-          setTimerState(response);
-          setProgress(calculateProgress(response));
-        }
+        setTimerState(newState);
+        setProgress(await calculateProgress(newState));
       }
     };
 
@@ -124,7 +135,7 @@ export const Timer: React.FC<TimerProps> = ({
     return () => {
       chrome.runtime.onMessage.removeListener(handleConfigChange);
     };
-  }, [timerState.status]);
+  }, []);
 
   useEffect(() => {
     const initializeTimer = async () => {
@@ -133,9 +144,11 @@ export const Timer: React.FC<TimerProps> = ({
         const response = await sendMessageToBackground({
           type: "GET_TIMER_STATE",
         });
+        console.log("running initializeTimer");
+        console.log("response", response);
         if (response && isTimerState(response)) {
           setTimerState(response);
-          setProgress(calculateProgress(response));
+          setProgress(await calculateProgress(response));
 
           // Load the task if there's a currentTaskId in the timer state
           if (response.currentTaskId) {
@@ -147,8 +160,10 @@ export const Timer: React.FC<TimerProps> = ({
         // Set up listener for timer updates
         const handleTimerUpdate = async (message: any) => {
           if (message.type === "TIMER_UPDATE") {
+            console.log("running handleTimerUpdate");
+            console.log("message", message);
             setTimerState(message.state);
-            setProgress(calculateProgress(message.state));
+            setProgress(await calculateProgress(message.state));
 
             // Update selected task when timer state changes
             if (message.state.currentTaskId) {
@@ -192,27 +207,42 @@ export const Timer: React.FC<TimerProps> = ({
     loadTasks();
   }, []);
 
-  const calculateProgress = (state: TimerState) => {
+  const calculateProgress = async (state: TimerStateDB) => {
+    //TODO - this is a hack to get the progress to work ! not ideal
+    const config = await storage.getTimerConfig();
+
     // If timer hasn't started (idle state), progress should be 0
     if (state.status === "idle") {
       return 0;
     }
 
     let total;
-    if (state.status === "break") {
+    // Use the timerMode property to determine the correct total duration
+    if (state.timerMode === "break" || state.status === "break") {
       const isLongBreak =
         state.pomodorosCompleted % config.longBreakInterval === 0;
       total = isLongBreak
         ? config.longBreakDuration
         : config.shortBreakDuration;
     } else {
+      console.log("config.pomoDuration", config);
       total = config.pomoDuration;
+      console.log("total", total);
     }
 
-    // Calculate how much time has elapsed instead of how much remains
-    return (state.timeRemaining / total) * 100;
-  };
+    // Ensure we have valid numbers
+    if (!total || total <= 0) {
+      console.warn("Invalid total duration:", total);
+      return 0;
+    }
 
+    // Calculate progress as a percentage of time elapsed
+    const elapsed = total - state.timeRemaining;
+    const progress = (elapsed / total) * 100;
+
+    // Ensure progress is between 0 and 100
+    return Math.min(Math.max(progress, 0), 100);
+  };
   const formatTime = (seconds: number): string => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = seconds % 60;
@@ -237,7 +267,7 @@ export const Timer: React.FC<TimerProps> = ({
   };
 
   const getTimerStatus = () => {
-    if (timerState.status === "break") {
+    if (timerState.timerMode === "break" || timerState.status === "break") {
       const isLongBreak =
         timerState.pomodorosCompleted % config.longBreakInterval === 0;
       return isLongBreak ? "Long Break" : "Short Break";
@@ -279,7 +309,11 @@ export const Timer: React.FC<TimerProps> = ({
         <div className="flex justify-between items-center">
           <CardTitle className="text-2xl">Focus Timer</CardTitle>
           <Badge
-            variant={timerState.status === "break" ? "secondary" : "default"}
+            variant={
+              timerState.timerMode === "break" || timerState.status === "break"
+                ? "secondary"
+                : "default"
+            }
             className="capitalize"
           >
             {getTimerStatus()}

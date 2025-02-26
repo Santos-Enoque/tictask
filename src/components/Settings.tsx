@@ -65,14 +65,18 @@ export const Settings: React.FC<SettingsProps> = ({ onSave }) => {
           Math.max(1, Number(config.longBreakDuration) || 15) * 60,
         longBreakInterval: Math.max(1, Number(config.longBreakInterval) || 4),
       };
-
+      console.log("validConfig", validConfig);
       // Save timer config using our storage system
       await storage.saveTimerConfig(validConfig);
+
+      // Get current timer state to include in the message
+      const currentState = await storage.getTimerState();
 
       // Notify other components about the config change
       await chrome.runtime.sendMessage({
         type: "CONFIG_CHANGED",
         config: validConfig,
+        currentStatus: currentState.status,
       });
 
       // Only notifications setting goes to chrome.storage.sync

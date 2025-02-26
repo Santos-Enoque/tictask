@@ -26,6 +26,7 @@ export interface TimerStateDB {
   pomodorosCompleted: number;
   currentTaskId: string | null;
   lastUpdateTime: number;
+  timerMode: 'focus' | 'break'; // New property
 }
 
 export interface TimerSession {
@@ -55,20 +56,22 @@ export interface SyncQueue {
     timestamp: string;
   }
 
-export const DEFAULT_VALUES = {
-  timerConfig: {
-    id: 'default',
-    pomoDuration: 25 * 60,
-    shortBreakDuration: 5 * 60,
-    longBreakDuration: 15 * 60,
-    longBreakInterval: 4
-  },
-  timerState: {
-    id: 'default',
-    timeRemaining: 25 * 60,
-    status: 'idle',
-    pomodorosCompleted: 0,
-    currentTaskId: null,
-    lastUpdateTime: Date.now()
-  }
-} as const;
+  export const DEFAULT_VALUES = {
+    timerState: {
+      id: 'default',
+      timeRemaining: 25 * 60, // 25 minutes in seconds
+      status: 'idle' as 'idle',
+      pomodorosCompleted: 0,
+      currentTaskId: null,
+      lastUpdateTime: Date.now(),
+      timerMode: 'focus' as 'focus'
+    },
+    timerConfig: {
+      id: 'default',
+      pomoDuration: 25 * 60, // 25 minutes in seconds
+      shortBreakDuration: 5 * 60, // 5 minutes in seconds
+      longBreakDuration: 15 * 60, // 15 minutes in seconds
+      longBreakInterval: 4 // After 4 pomodoros, take a long break
+    }
+  };
+  
