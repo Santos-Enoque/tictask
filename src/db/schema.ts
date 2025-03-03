@@ -17,6 +17,7 @@ export interface Task {
   pomodorosCompleted: number;
   estimatedPomodoros?: number;
   dueDate: number;
+  ongoing: boolean;
 }
 
 export interface TimerStateDB {

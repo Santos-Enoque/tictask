@@ -8,7 +8,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { TimerSession } from "@/types";
 import html2canvas from "html2canvas";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";

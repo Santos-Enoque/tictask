@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { TimerOverlay } from "@/components/TimerOverlay";
+import { ThemeProvider } from "@/components/ThemeProvider";
 
 const OverlayApp = () => {
   const [timerState, setTimerState] = useState({
@@ -35,12 +36,14 @@ const OverlayApp = () => {
   }
 
   return (
-    <TimerOverlay
-      timeRemaining={timerState.timeRemaining}
-      status={timerState.status}
-      onPause={handlePause}
-      onResume={handleResume}
-    />
+    <ThemeProvider>
+      <TimerOverlay
+        timeRemaining={timerState.timeRemaining}
+        status={timerState.status}
+        onPause={handlePause}
+        onResume={handleResume}
+      />
+    </ThemeProvider>
   );
 };
 

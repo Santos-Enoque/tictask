@@ -1,5 +1,5 @@
 // src/lib/services/taskService.ts
-import { Task } from '@/types';
+import { Task } from '@/db/schema';
 import { storage } from '@/db/local';
 
 export class TaskService {

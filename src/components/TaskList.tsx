@@ -9,8 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Plus,
-  Timer,
-  Check,
   Trash2,
   Calendar,
   MoreVertical,
@@ -37,9 +35,10 @@ import {
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { CalendarIcon } from "@radix-ui/react-icons";
-import { Task, TaskStatus } from "@/types";
 import { Checkbox } from "@/components/ui/checkbox";
-
+import { Switch } from "@/components/ui/switch";
+import { Task } from "@/db/schema";
+import { TaskStatus } from "@/types";
 interface TaskItemProps {
   task: Task;
   onDelete: (taskId: string) => void;
@@ -125,16 +124,17 @@ const TaskItem: React.FC<TaskItemProps> = ({
         ${task.status === "completed" ? "opacity-60" : ""}
         transition-all
         hover:shadow-sm
+        w-full max-w-full flex-shrink-0 flex-grow
       `}
     >
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-start gap-3 flex-1 min-w-0">
+      <div className="flex items-center justify-between gap-4 w-full">
+        <div className="flex items-start gap-3 flex-1 min-w-0 w-full">
           <Checkbox
             checked={task.status === "completed"}
             onCheckedChange={handleStatusChange}
             className="mt-1"
           />
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 w-full">
             <div className="flex items-start justify-between gap-2">
               <h3
                 className={`font-medium truncate ${
@@ -167,6 +167,11 @@ const TaskItem: React.FC<TaskItemProps> = ({
                   <span className="ml-1">/ {task.estimatedPomodoros}</span>
                 )}
               </Badge>
+              {task.ongoing && (
+                <Badge variant="secondary" className="text-xs">
+                  <span className="mr-1">Ongoing</span>
+                </Badge>
+              )}
               {task.dueDate && (
                 <Badge variant="outline" className="text-xs">
                   <CalendarIcon className="mr-1 h-3 w-3" />
@@ -256,6 +261,7 @@ export const TaskList: React.FC<TaskListProps> = ({
     description: "",
     estimatedPomodoros: "",
     dueDate: new Date(),
+    ongoing: false,
   });
 
   const taskService = TaskService.getInstance();
@@ -295,14 +301,30 @@ export const TaskList: React.FC<TaskListProps> = ({
     const end = new Date(endDate);
     end.setHours(23, 59, 59, 999);
 
+    // Filter tasks based on date range and ongoing status
     const filteredTasks = loadedTasks.filter((task) => {
+      // Always include ongoing tasks
+      if (task.ongoing) return true;
+
+      // For non-ongoing tasks, check if they fall within the date range
       const taskDate = new Date(task.dueDate);
       taskDate.setHours(0, 0, 0, 0); // Normalize task date to start of day
       return taskDate >= start && taskDate <= end;
     });
 
-    setTasks(filteredTasks);
+    // Sort tasks: ongoing tasks first, then by due date
+    const sortedTasks = filteredTasks.sort((a, b) => {
+      // First sort by ongoing status (ongoing tasks come first)
+      if (a.ongoing && !b.ongoing) return -1;
+      if (!a.ongoing && b.ongoing) return 1;
+
+      // Then sort by due date (earlier dates first)
+      return a.dueDate - b.dueDate;
+    });
+
+    setTasks(sortedTasks);
   };
+
   const handleAddTask = async () => {
     if (!newTask.title.trim()) return;
 
@@ -314,6 +336,7 @@ export const TaskList: React.FC<TaskListProps> = ({
         : undefined,
       status: "to_do",
       dueDate: newTask.dueDate.getTime(),
+      ongoing: newTask.ongoing,
     });
 
     setNewTask({
@@ -321,6 +344,7 @@ export const TaskList: React.FC<TaskListProps> = ({
       description: "",
       estimatedPomodoros: "",
       dueDate: new Date(),
+      ongoing: false,
     });
     setIsAddingTask(false);
     loadTasks();
@@ -387,6 +411,7 @@ export const TaskList: React.FC<TaskListProps> = ({
       description: editingTask.description,
       estimatedPomodoros: editingTask.estimatedPomodoros,
       dueDate: editingTask.dueDate,
+      ongoing: editingTask.ongoing,
     });
 
     setEditingTask(null);
@@ -403,9 +428,9 @@ export const TaskList: React.FC<TaskListProps> = ({
   };
 
   return (
-    <Card className="h-full">
-      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle className="text-xl">Tasks</CardTitle>
+    <div className="h-full w-full">
+      <div className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <h2 className="text-xl font-semibold">Tasks</h2>
         <div className="flex items-center gap-2">
           <div className="relative">
             <DatePicker
@@ -498,6 +523,21 @@ export const TaskList: React.FC<TaskListProps> = ({
                     />
                   </div>
                 </div>
+                <div className="flex items-center justify-between space-y-0 py-2">
+                  <div className="flex flex-col space-y-1">
+                    <Label htmlFor="ongoing-task">Ongoing Task</Label>
+                    <span className="text-xs text-muted-foreground">
+                      Show this task every day until completion
+                    </span>
+                  </div>
+                  <Switch
+                    id="ongoing-task"
+                    checked={newTask.ongoing}
+                    onCheckedChange={(checked) =>
+                      setNewTask({ ...newTask, ongoing: checked })
+                    }
+                  />
+                </div>
                 <Button onClick={handleAddTask} className="w-full">
                   Add Task
                 </Button>
@@ -505,25 +545,27 @@ export const TaskList: React.FC<TaskListProps> = ({
             </DialogContent>
           </Dialog>
         </div>
-      </CardHeader>
-      <CardContent>
-        <ScrollArea className="h-[300px] pr-4">
+      </div>
+      <div className="mt-2 w-full">
+        <ScrollArea className="h-[300px] w-full">
           {tasks.length === 0 ? (
-            <div className="text-center text-muted-foreground py-8">
+            <div className="text-center text-muted-foreground py-8 w-full">
               No tasks for the selected date range. Add one to get started!
             </div>
           ) : (
-            tasks.map((task) => (
-              <TaskItem
-                key={task.id}
-                task={task}
-                onDelete={handleDeleteTask}
-                onComplete={handleCompleteTask}
-                onSelect={handleTaskSelect}
-                onEdit={startEditing}
-                isSelected={task.id === selectedTaskId}
-              />
-            ))
+            <div className="w-full pr-4">
+              {tasks.map((task) => (
+                <TaskItem
+                  key={task.id}
+                  task={task}
+                  onDelete={handleDeleteTask}
+                  onComplete={handleCompleteTask}
+                  onSelect={handleTaskSelect}
+                  onEdit={startEditing}
+                  isSelected={task.id === selectedTaskId}
+                />
+              ))}
+            </div>
           )}
         </ScrollArea>
 
@@ -604,13 +646,30 @@ export const TaskList: React.FC<TaskListProps> = ({
                   />
                 </div>
               </div>
+              <div className="flex items-center justify-between space-y-0 py-2">
+                <div className="flex flex-col space-y-1">
+                  <Label htmlFor="edit-ongoing-task">Ongoing Task</Label>
+                  <span className="text-xs text-muted-foreground">
+                    Show this task every day until completion
+                  </span>
+                </div>
+                <Switch
+                  id="edit-ongoing-task"
+                  checked={editingTask?.ongoing || false}
+                  onCheckedChange={(checked) =>
+                    setEditingTask((prev) =>
+                      prev ? { ...prev, ongoing: checked } : null
+                    )
+                  }
+                />
+              </div>
               <Button onClick={handleEditTask} className="w-full">
                 Update Task
               </Button>
             </div>
           </DialogContent>
         </Dialog>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };

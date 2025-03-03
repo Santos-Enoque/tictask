@@ -1,16 +1,18 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import "../styles/global.css";
 import "./options.css";
+
 const Options = () => {
   return (
-    <div>
-      <p>Options</p>
-    </div>
+    <ThemeProvider>
+      <div>
+        <p>Options</p>
+      </div>
+    </ThemeProvider>
   );
 };
 
-const container = document.createElement("div");
-document.body.appendChild(container);
-const root = createRoot(container);
+const root = createRoot(document.getElementById("root")!);
 root.render(<Options />);

@@ -28,7 +28,7 @@ const App = () => {
   };
 
   return (
-    <div className="w-[400px] min-h-[500px] bg-background p-4">
+    <div className="w-[400px] min-h-[550px] bg-background p-4">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="timer" className="flex items-center">

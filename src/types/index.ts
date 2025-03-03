@@ -1,43 +1,5 @@
 // src/types/index.ts
-
-export interface Task {
-    id: string;
-    title: string;
-    description?: string;
-    status: TaskStatus;
-    createdAt: number;
-    updatedAt: number;
-    completedAt?: number;
-    pomodorosCompleted: number;
-    estimatedPomodoros?: number;
-    dueDate: number; // timestamp
-  }
-  
   export type TaskStatus = 'to_do' | 'in_progress' | 'completed';
-export interface TimerState {
-  timeRemaining: number;
-  status: "idle" | "running" | "paused" | "break";
-  pomodorosCompleted: number;
-  currentTaskId: string | null;
-}
-  
-  export interface TimerConfig {
-    pomoDuration: number;
-    shortBreakDuration: number;
-    longBreakDuration: number;
-    longBreakInterval: number;
-  }
-  
-  export interface TimerSession {
-    id: string;
-    startTime: number;
-    endTime: number;
-    type: 'pomodoro' | 'short_break' | 'long_break';
-    completed: boolean;
-    taskId?: string | null;
-    date: string; // YYYY-MM-DD format for easier querying
-    duration: number; // in seconds
-  }
   
   export interface DailyStats {
     date: string; // YYYY-MM-DD format

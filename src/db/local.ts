@@ -50,7 +50,7 @@ export class LocalStorage {
   }
 
   private async initDB() {
-    this.db = await openDB<TicTaskDB>('tictask-db-1', 1, {
+    this.db = await openDB<TicTaskDB>('tictask-db-2', 1, {
       upgrade(db) {
         // Create object stores if they don't exist
         if (!db.objectStoreNames.contains('tasks')) {
