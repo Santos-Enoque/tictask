@@ -155,19 +155,28 @@ class BackgroundTimer {
   private async broadcastState() {
     try {
       const state = this.getState();
-      // Use runtime.sendMessage with a catch block
-      await chrome.runtime.sendMessage({ 
+      
+      // Send message without awaiting to avoid uncaught promise rejection
+      chrome.runtime.sendMessage({ 
         type: 'TIMER_UPDATE', 
         state 
       }).catch((error) => {
-        // Ignore "receiving end does not exist" errors as they're expected
-        // when popup is closed
-        if (!error.message.includes("receiving end does not exist")) {
+        // Check for various forms of "no receiver" errors
+        const errorMessage = error?.message?.toLowerCase() || '';
+        const isReceiverError = 
+          errorMessage.includes('receiving end does not exist') ||
+          errorMessage.includes('could not establish connection') ||
+          errorMessage.includes('disconnected port') ||
+          errorMessage.includes('no tab with id') ||
+          errorMessage.includes('port closed');
+          
+        if (!isReceiverError) {
           console.error("Error broadcasting state:", error);
         }
+        // Otherwise, silently ignore expected disconnection errors
       });
     } catch (error) {
-      // Handle any other errors that might occur
+      // Log only unexpected errors
       console.error("Failed to broadcast state:", error);
     }
   }

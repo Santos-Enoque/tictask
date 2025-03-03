@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import { Task, TimerConfig, TimerStateDB } from "@/db/schema";
 import { TaskService } from "@/lib/services/taskService";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Play, Pause, RotateCcw, Coffee } from "lucide-react";
@@ -37,7 +36,7 @@ export const Timer: React.FC<TimerProps> = ({
   });
   const [progress, setProgress] = useState<number>(0);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [config, setConfig] = useState<TimerConfig >({
+  const [config, setConfig] = useState<TimerConfig>({
     id: "default",
     pomoDuration: 25 * 60,
     shortBreakDuration: 5 * 60,
@@ -45,6 +44,7 @@ export const Timer: React.FC<TimerProps> = ({
     longBreakInterval: 4,
   });
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [todaysFocusSessions, setTodaysFocusSessions] = useState<number>(0);
 
   // Add this type guard function at the top level of your component
   const isTimerState = (value: unknown): value is TimerStateDB => {
@@ -157,6 +157,9 @@ export const Timer: React.FC<TimerProps> = ({
           }
         }
 
+        // Load today's sessions when timer initializes
+        await loadTodaysSessions();
+
         // Set up listener for timer updates
         const handleTimerUpdate = async (message: any) => {
           if (message.type === "TIMER_UPDATE") {
@@ -172,6 +175,9 @@ export const Timer: React.FC<TimerProps> = ({
             } else {
               setSelectedTask(null);
             }
+
+            // Reload today's sessions when timer updates
+            await loadTodaysSessions();
           }
         };
 
@@ -303,138 +309,180 @@ export const Timer: React.FC<TimerProps> = ({
     });
   };
 
+  const loadTodaysSessions = async () => {
+    // Get today's date at the start of the day
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    // Get tomorrow's date at the start of the day (for range end)
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Get sessions from today
+    const sessions = await storage.getSessionsByDateRange(
+      today.toISOString(),
+      tomorrow.toISOString()
+    );
+
+    // Count only completed pomodoro sessions
+    const todaysPomodoros = sessions.filter(
+      (s) => s.type === "pomodoro" && s.completed
+    ).length;
+
+    setTodaysFocusSessions(todaysPomodoros);
+  };
+
   return (
-    <Card className="w-full">
-      <CardHeader className="space-y-1">
-        <div className="flex justify-between items-center">
-          <CardTitle className="text-2xl">Focus Timer</CardTitle>
-          <Badge
-            variant={
-              timerState.timerMode === "break" || timerState.status === "break"
-                ? "secondary"
-                : "default"
-            }
-            className="capitalize"
-          >
-            {getTimerStatus()}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="flex flex-col items-center space-y-4">
-          {timerState.status !== "break" && (
-            <Select
-              disabled={isTimerActive}
-              value={selectedTask?.id || ""}
-              onValueChange={handleTaskSelect}
+    <div className="w-full h-full flex flex-col items-center justify-center">
+      <div className="w-full max-w-md flex flex-col items-center mt-4 mx-2">
+        <div className="space-y-1 w-full mb-4">
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold">Focus Timer</h2>
+            <Badge
+              variant={
+                timerState.timerMode === "break" ||
+                timerState.status === "break"
+                  ? "secondary"
+                  : "default"
+              }
+              className="capitalize"
             >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a task...">
-                  {selectedTask?.title || "Select a task..."}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                {tasks.map((task) => (
-                  <SelectItem key={task.id} value={task.id}>
-                    {task.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          <div className="text-6xl font-bold tabular-nums">
-            {formatTime(timerState.timeRemaining)}
+              {getTimerStatus()}
+            </Badge>
           </div>
-
-          <Progress value={progress} className="w-full" />
-
-          <div className="flex justify-center space-x-2">
-            {timerState.status === "idle" && (
-              <Button variant="default" size="lg" onClick={handleStart}>
-                <Play className="mr-2 h-4 w-4" />
-                Start
-              </Button>
+        </div>
+        <div className="space-y-4 w-full">
+          <div className="flex flex-col items-center space-y-4">
+            {timerState.status !== "break" && (
+              <Select
+                disabled={isTimerActive}
+                value={selectedTask?.id || ""}
+                onValueChange={handleTaskSelect}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a task...">
+                    {selectedTask?.title || "Select a task..."}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {tasks.map((task) => (
+                    <SelectItem key={task.id} value={task.id}>
+                      {task.title}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             )}
 
-            {timerState.status === "running" && (
-              <Button variant="secondary" size="lg" onClick={handlePause}>
-                <Pause className="mr-2 h-4 w-4" />
-                Pause
-              </Button>
-            )}
+            <div className="text-6xl font-bold tabular-nums">
+              {formatTime(timerState.timeRemaining)}
+            </div>
 
-            {timerState.status === "paused" && (
-              <Button variant="default" size="lg" onClick={handleStart}>
-                <Play className="mr-2 h-4 w-4" />
-                Resume
-              </Button>
-            )}
+            <Progress value={progress} className="w-full" />
 
-            {/* Break controls */}
-            {timerState.status === "break" && (
-              <div className="flex space-x-2">
-                {timerState.timeRemaining === config.shortBreakDuration ||
-                timerState.timeRemaining === config.longBreakDuration ? (
-                  // Break not started yet
-                  <>
-                    <Button
-                      variant="default"
-                      size="lg"
-                      onClick={handleStartBreak}
-                    >
-                      <Coffee className="mr-2 h-4 w-4" />
-                      Start Break
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      size="lg"
-                      onClick={handleSkipBreak}
-                    >
-                      <Play className="mr-2 h-4 w-4" />
-                      Skip Break
-                    </Button>
-                  </>
-                ) : (
-                  // Break in progress
-                  <>
-                    <Button variant="secondary" size="lg" onClick={handlePause}>
-                      <Pause className="mr-2 h-4 w-4" />
-                      Pause Break
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      onClick={handleSkipBreak}
-                    >
-                      <Play className="mr-2 h-4 w-4" />
-                      Skip Break
-                    </Button>
-                  </>
+            <div className="flex justify-center space-x-2">
+              {timerState.status === "idle" && (
+                <Button variant="default" size="lg" onClick={handleStart}>
+                  <Play className="mr-2 h-4 w-4" />
+                  Start
+                </Button>
+              )}
+
+              {timerState.status === "running" && (
+                <Button variant="secondary" size="lg" onClick={handlePause}>
+                  <Pause className="mr-2 h-4 w-4" />
+                  Pause
+                </Button>
+              )}
+
+              {timerState.status === "paused" && (
+                <Button variant="default" size="lg" onClick={handleStart}>
+                  <Play className="mr-2 h-4 w-4" />
+                  Resume
+                </Button>
+              )}
+
+              {/* Break controls */}
+              {timerState.status === "break" && (
+                <div className="flex space-x-2">
+                  {timerState.timeRemaining === config.shortBreakDuration ||
+                  timerState.timeRemaining === config.longBreakDuration ? (
+                    // Break not started yet
+                    <>
+                      <Button
+                        variant="default"
+                        size="lg"
+                        onClick={handleStartBreak}
+                      >
+                        <Coffee className="mr-2 h-4 w-4" />
+                        Start Break
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="lg"
+                        onClick={handleSkipBreak}
+                      >
+                        <Play className="mr-2 h-4 w-4" />
+                        Skip Break
+                      </Button>
+                    </>
+                  ) : (
+                    // Break in progress
+                    <>
+                      <Button
+                        variant="secondary"
+                        size="lg"
+                        onClick={handlePause}
+                      >
+                        <Pause className="mr-2 h-4 w-4" />
+                        Pause Break
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="lg"
+                        onClick={handleSkipBreak}
+                      >
+                        <Play className="mr-2 h-4 w-4" />
+                        Skip Break
+                      </Button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {timerState.status !== "idle" &&
+                timerState.status !== "break" && (
+                  <Button variant="outline" size="lg" onClick={handleReset}>
+                    <RotateCcw className="mr-2 h-4 w-4" />
+                    Reset
+                  </Button>
                 )}
+            </div>
+
+            {timerState.status === "break" && timerState.timeRemaining > 0 && (
+              <div className="flex items-center text-sm text-muted-foreground">
+                <Coffee className="mr-2 h-4 w-4" />
+                Take a well-deserved break!
               </div>
             )}
 
-            {timerState.status !== "idle" && timerState.status !== "break" && (
-              <Button variant="outline" size="lg" onClick={handleReset}>
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Reset
-              </Button>
-            )}
-          </div>
-
-          {timerState.status === "break" && timerState.timeRemaining > 0 && (
-            <div className="flex items-center text-sm text-muted-foreground">
-              <Coffee className="mr-2 h-4 w-4" />
-              Take a well-deserved break!
+            <div className="text-sm text-muted-foreground flex gap-4">
+              <span>Today: {todaysFocusSessions}</span>
+              <span>Total: {timerState.pomodorosCompleted}</span>
             </div>
-          )}
-
-          <div className="text-sm text-muted-foreground">
-            Pomodoros completed: {timerState.pomodorosCompleted}
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      <div className="w-full text-center absolute bottom-4 text-sm text-muted-foreground">
+        Developed with ❤️ by{" "}
+        <a
+          href="https://github.com/SantosEnoque"
+          className="underline hover:text-primary"
+        >
+          Santos Enoque
+        </a>
+      </div>
+    </div>
   );
 };
