@@ -136,13 +136,13 @@ export const Settings: React.FC<SettingsProps> = ({ onSave }) => {
       <CardContent className="space-y-6">
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="timer" className="flex items-center">
-              <Clock className="mr-2 h-4 w-4" />
-              Timer
-            </TabsTrigger>
             <TabsTrigger value="account" className="flex items-center">
               <User className="mr-2 h-4 w-4" />
               Account
+            </TabsTrigger>
+            <TabsTrigger value="timer" className="flex items-center">
+              <Clock className="mr-2 h-4 w-4" />
+              Timer
             </TabsTrigger>
             <TabsTrigger value="system" className="flex items-center">
               <Settings2 className="mr-2 h-4 w-4" />

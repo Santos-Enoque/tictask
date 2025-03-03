@@ -561,7 +561,7 @@ export const TaskList: React.FC<TaskListProps> = ({
         </div>
       </div>
       <div className="mt-2 w-full">
-        <ScrollArea className="h-[300px] w-full">
+        <ScrollArea className="h-[500px] w-full">
           {tasks.length === 0 ? (
             <div className="text-center text-muted-foreground py-8 w-full">
               No tasks for the selected date range. Add one to get started!

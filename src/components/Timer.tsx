@@ -6,7 +6,7 @@ import { TaskService } from "@/lib/services/taskService";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { Play, Pause, RotateCcw, Coffee } from "lucide-react";
+import { Play, Pause, RotateCcw, Coffee, Plus } from "lucide-react";
 import { storage } from "@/db/local";
 import {
   Select,
@@ -19,11 +19,13 @@ import {
 interface TimerProps {
   selectedTaskId?: string | null;
   onTaskComplete?: () => void;
+  onAddTask?: () => void;
 }
 
 export const Timer: React.FC<TimerProps> = ({
   selectedTaskId,
   onTaskComplete,
+  onAddTask,
 }) => {
   const [timerState, setTimerState] = useState<TimerStateDB>({
     id: "default",
@@ -354,24 +356,62 @@ export const Timer: React.FC<TimerProps> = ({
         <div className="space-y-4 w-full">
           <div className="flex flex-col items-center space-y-4">
             {timerState.status !== "break" && (
-              <Select
-                disabled={isTimerActive}
-                value={selectedTask?.id || ""}
-                onValueChange={handleTaskSelect}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select a task...">
-                    {selectedTask?.title || "Select a task..."}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent>
-                  {tasks.map((task) => (
-                    <SelectItem key={task.id} value={task.id}>
-                      {task.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <>
+                {tasks.length > 0 ? (
+                  <Select
+                    disabled={isTimerActive}
+                    value={selectedTask?.id || ""}
+                    onValueChange={handleTaskSelect}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select a task...">
+                        {selectedTask?.title || "Select a task..."}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {tasks.map((task) => (
+                        <SelectItem key={task.id} value={task.id}>
+                          {task.title}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={onAddTask}
+                    disabled={isTimerActive}
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Add task
+                  </Button>
+                )}
+              </>
+            )}
+
+            {selectedTask?.estimatedPomodoros && (
+              <div className="flex justify-center items-center space-x-1 mb-2">
+                {Array.from({ length: selectedTask.estimatedPomodoros }).map(
+                  (_, index) => (
+                    <span
+                      key={index}
+                      className={`inline-block rounded-full 
+                      ${
+                        index < (selectedTask.pomodorosCompleted || 0)
+                          ? "bg-primary"
+                          : "bg-muted border border-muted-foreground/30"
+                      } 
+                      h-3 w-3`}
+                      aria-label={
+                        index < (selectedTask.pomodorosCompleted || 0)
+                          ? "Completed pomodoro"
+                          : "Remaining pomodoro"
+                      }
+                    />
+                  )
+                )}
+              </div>
             )}
 
             <div className="text-6xl font-bold tabular-nums">
@@ -477,8 +517,10 @@ export const Timer: React.FC<TimerProps> = ({
       <div className="w-full text-center absolute bottom-4 text-sm text-muted-foreground">
         Developed with ❤️ by{" "}
         <a
-          href="https://github.com/SantosEnoque"
+          href="https://github.com/Santos-Enoque"
           className="underline hover:text-primary"
+          target="_blank"
+          rel="noopener noreferrer"
         >
           Santos Enoque
         </a>

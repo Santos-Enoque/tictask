@@ -28,8 +28,12 @@ const App = () => {
     chrome.runtime.sendMessage({ type: "GET_TIMER_STATE" });
   };
 
+  const handleAddTask = () => {
+    setActiveTab("tasks"); // Switch to the tasks tab
+  };
+
   return (
-    <div className="w-[400px] min-h-[550px] bg-background p-4">
+    <div className="w-[400px] min-h-[580px] bg-background p-4">
       <Tabs value={activeTab} onValueChange={setActiveTab} className="h-full">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="timer" className="flex items-center">
@@ -54,6 +58,7 @@ const App = () => {
           <Timer
             selectedTaskId={selectedTaskId}
             onTaskComplete={handleTaskComplete}
+            onAddTask={handleAddTask}
           />
         </TabsContent>
 
