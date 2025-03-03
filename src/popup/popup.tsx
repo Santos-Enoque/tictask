@@ -5,6 +5,7 @@ import { TaskList } from "@/components/TaskList";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Clock, ListTodo, BarChart3, SettingsIcon } from "lucide-react";
 import { Settings } from "@/components/Settings";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import "../styles/global.css";
 import "../styles/datepicker.css";
 import "./popup.css";
@@ -79,4 +80,8 @@ const App = () => {
 const container = document.createElement("div");
 document.body.appendChild(container);
 const root = createRoot(container);
-root.render(<App />);
+root.render(
+  <ThemeProvider>
+    <App />
+  </ThemeProvider>
+);
