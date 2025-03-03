@@ -264,6 +264,9 @@ export const TaskList: React.FC<TaskListProps> = ({
     ongoing: false,
   });
 
+  // Add this state for completion rate
+  const [completionRate, setCompletionRate] = useState<number>(0);
+
   const taskService = TaskService.getInstance();
 
   useEffect(() => {
@@ -315,6 +318,18 @@ export const TaskList: React.FC<TaskListProps> = ({
         return taskDate >= start && taskDate <= end;
       }
     });
+
+    // Calculate completion rate
+    if (filteredTasks.length > 0) {
+      const completedTasks = filteredTasks.filter(
+        (task) => task.status === "completed"
+      ).length;
+      setCompletionRate(
+        Math.round((completedTasks / filteredTasks.length) * 100)
+      );
+    } else {
+      setCompletionRate(0);
+    }
 
     // Sort tasks: incomplete tasks first, then ongoing tasks, then by due date, completed tasks last
     const sortedTasks = filteredTasks.sort((a, b) => {
@@ -441,10 +456,28 @@ export const TaskList: React.FC<TaskListProps> = ({
     setIsEditingTask(true);
   };
 
+  // Helper function to get the color based on completion rate
+  const getCompletionRateColor = () => {
+    if (completionRate < 50) return "text-red-500 border-red-500";
+    if (completionRate < 90) return "text-orange-500 border-orange-500";
+    if (completionRate < 100) return "text-yellow-500 border-yellow-500";
+    return "text-green-500 border-green-500";
+  };
+
   return (
     <div className="h-full w-full">
       <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-        <h2 className="text-xl font-semibold">Tasks</h2>
+        <div className="flex items-center gap-2">
+          <h2 className="text-xl font-semibold">Tasks</h2>
+          {tasks.length > 0 && (
+            <Badge
+              variant="outline"
+              className={`${getCompletionRateColor()} text-xs`}
+            >
+              {completionRate}% completed
+            </Badge>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           <div className="relative">
             <DatePicker
@@ -561,7 +594,7 @@ export const TaskList: React.FC<TaskListProps> = ({
         </div>
       </div>
       <div className="mt-2 w-full">
-        <ScrollArea className="h-[500px] w-full">
+        <ScrollArea className="h-[440px] w-full">
           {tasks.length === 0 ? (
             <div className="text-center text-muted-foreground py-8 w-full">
               No tasks for the selected date range. Add one to get started!
