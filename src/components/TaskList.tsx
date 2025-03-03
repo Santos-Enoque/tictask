@@ -175,7 +175,7 @@ const TaskItem: React.FC<TaskItemProps> = ({
               {task.dueDate && (
                 <Badge variant="outline" className="text-xs">
                   <CalendarIcon className="mr-1 h-3 w-3" />
-                  {format(new Date(task.dueDate), "MMM d, yyyy")}
+                  {format(new Date(task.dueDate), "MMM d, yy")}
                 </Badge>
               )}
             </div>
@@ -303,23 +303,37 @@ export const TaskList: React.FC<TaskListProps> = ({
 
     // Filter tasks based on date range and ongoing status
     const filteredTasks = loadedTasks.filter((task) => {
-      // Always include ongoing tasks
-      if (task.ongoing) return true;
-
-      // For non-ongoing tasks, check if they fall within the date range
       const taskDate = new Date(task.dueDate);
       taskDate.setHours(0, 0, 0, 0); // Normalize task date to start of day
-      return taskDate >= start && taskDate <= end;
+
+      if (task.ongoing) {
+        // For ongoing tasks: show if due date is today or in the future
+        // This ensures ongoing tasks don't show past their due date
+        return taskDate >= start;
+      } else {
+        // For non-ongoing tasks: only show if they fall within the selected date range
+        return taskDate >= start && taskDate <= end;
+      }
     });
 
-    // Sort tasks: ongoing tasks first, then by due date
+    // Sort tasks: incomplete tasks first, then ongoing tasks, then by due date, completed tasks last
     const sortedTasks = filteredTasks.sort((a, b) => {
-      // First sort by ongoing status (ongoing tasks come first)
-      if (a.ongoing && !b.ongoing) return -1;
-      if (!a.ongoing && b.ongoing) return 1;
+      // First sort by completion status (incomplete tasks come first)
+      if (a.status !== "completed" && b.status === "completed") return -1;
+      if (a.status === "completed" && b.status !== "completed") return 1;
 
-      // Then sort by due date (earlier dates first)
-      return a.dueDate - b.dueDate;
+      // For tasks with the same completion status
+      if (a.status === b.status) {
+        if (a.status !== "completed") {
+          // For incomplete tasks, sort by ongoing status first
+          if (a.ongoing && !b.ongoing) return -1;
+          if (!a.ongoing && b.ongoing) return 1;
+        }
+        // Then sort by due date (earlier dates first)
+        return a.dueDate - b.dueDate;
+      }
+
+      return 0;
     });
 
     setTasks(sortedTasks);
@@ -553,7 +567,7 @@ export const TaskList: React.FC<TaskListProps> = ({
               No tasks for the selected date range. Add one to get started!
             </div>
           ) : (
-            <div className="w-full pr-4">
+            <div className="w-full">
               {tasks.map((task) => (
                 <TaskItem
                   key={task.id}
