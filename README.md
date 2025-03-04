@@ -30,7 +30,7 @@
 ### **🛠️ Manual Installation (For Developers & Testing)**  
 1. Clone the repository:  
    ```bash
-   git clone https://github.com/yourusername/tictask.git
+   git clone git@github.com:Santos-Enoque/tictask.git
    cd tictask
    ```
 2. Open Chrome and navigate to `chrome://extensions/`.  
